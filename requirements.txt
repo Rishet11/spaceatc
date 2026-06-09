@@ -1,0 +1,2 @@
+# SpaceATC — Root requirements (mirrors backend/requirements.txt)
+-r backend/requirements.txt

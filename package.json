@@ -1,0 +1,6 @@
+{
+  "name": "spaceatc",
+  "private": true,
+  "description": "SpaceATC — Multi-agent satellite collision avoidance system",
+  "scripts": {}
+}
