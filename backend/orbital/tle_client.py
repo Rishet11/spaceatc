@@ -42,20 +42,43 @@ async def fetch_tle_group(url: str) -> str:
         Raw TLE text — one 3-line block per satellite, separated by newlines.
 
     Raises:
-        httpx.HTTPStatusError: on non-2xx responses.
-        httpx.TimeoutException:  if the request exceeds 30 s.
+        httpx.HTTPStatusError: on non-2xx responses if cache fallback fails.
+        httpx.TimeoutException:  if the request exceeds 30 s and cache fallback fails.
     """
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        logger.info("Fetching TLE data from %s", url)
-        response = await client.get(url)
-        response.raise_for_status()
-        text = response.text
-        logger.info(
-            "Fetched %.1f kB — approx %d satellites",
-            len(text) / 1024,
-            text.strip().count("\n") // 3,
+    from pathlib import Path
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
+            logger.info("Fetching TLE data from %s", url)
+            response = await client.get(url)
+            response.raise_for_status()
+            text = response.text
+            logger.info(
+                "Fetched %.1f kB — approx %d satellites",
+                len(text) / 1024,
+                text.strip().count("\n") // 3,
+            )
+            return text
+    except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+        logger.warning(
+            "Failed to fetch TLE from CelesTrak: %s. Attempting fallback to local cache...",
+            exc,
         )
-        return text
+        cache_path = Path(__file__).parent / "starlink_cache.tle"
+        if cache_path.exists():
+            text = cache_path.read_text(encoding="utf-8")
+            logger.info(
+                "Successfully loaded TLE data from local cache (%s) — approx %d satellites",
+                cache_path.name,
+                text.strip().count("\n") // 3,
+            )
+            return text
+        else:
+            logger.error("Local TLE cache not found at %s", cache_path)
+            raise
 
 
 def parse_tle_block(tle_text: str) -> list[tuple[str, Satrec]]:
