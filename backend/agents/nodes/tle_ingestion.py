@@ -1,1 +1,84 @@
-# backend/agents/nodes/tle_ingestion.py — Fetch + parse CelesTrak data
+"""
+backend/agents/nodes/tle_ingestion.py — Node 1: Ingest TLEs and update DB.
+"""
+
+import logging
+
+from backend.agents.state import AgentState
+from backend.api.schemas import WSMessage, WSMessageType
+from backend.db.store import upsert_satellite
+from backend.orbital.tle_client import CELESTRAK_STARLINK_TLE, fetch_and_parse
+
+logger = logging.getLogger(__name__)
+
+# PRD §9.4
+OPERATOR_GROUPS = {
+    "SpaceX": ["STARLINK-"],
+    "OneWeb": ["ONEWEB-"],
+    "Demo_A": ["DEMO-SAT-A"],
+    "Demo_B": ["DEMO-SAT-B"],
+}
+
+def _assign_operator(sat_name: str) -> str:
+    """Assign operator based on prefix, defaulting to 'Unknown'."""
+    upper_name = sat_name.upper()
+    for op, prefixes in OPERATOR_GROUPS.items():
+        if any(upper_name.startswith(p) for p in prefixes):
+            return op
+    return "Unknown"
+
+async def ingest_tle(state: AgentState) -> dict:
+    """
+    Ingest TLEs, take first 100, assign operators, save to DB, and queue WS event.
+    """
+    logger.info("Node: ingest_tle starting...")
+    
+    # 1. Fetch & parse
+    satellites_raw = await fetch_and_parse(CELESTRAK_STARLINK_TLE)
+    
+    # 2. Take first 100
+    top_100 = satellites_raw[:100]
+    
+    processed_sats = []
+    
+    # 3. Assign operator & upsert
+    for name, satrec in top_100:
+        op = _assign_operator(name)
+        
+        # We need the original OMM/TLE lines. For the demo, we'll store basic info
+        # since tle_client doesn't return full OMM json yet, just the Satrec.
+        sat_dict = {
+            "norad_id": str(satrec.satnum),
+            "name": name,
+            "operator": op,
+            "fuel_units": 100.0,
+            "maneuver_count": 0,
+            # Placeholder for actual OMM JSON if needed later, but store requires it to be dict or string
+            "omm_json": {"source": "celestrak", "type": "tle", "satnum": satrec.satnum} 
+        }
+        await upsert_satellite(sat_dict)
+        
+        # Also keep a richer dict in state for the next nodes to use
+        processed_sats.append({
+            "norad_id": str(satrec.satnum),
+            "name": name,
+            "operator": op,
+            "satrec": satrec,
+            "fuel_units": 100.0,
+            "maneuver_count": 0
+        })
+
+    msg = f"[TLE Ingestion] Loaded {len(processed_sats)} satellites."
+    
+    # 4. Queue system_status WS event
+    ws_event = WSMessage.now(
+        type_=WSMessageType.system_status,
+        payload={"status": "ACTIVE", "message": msg}
+    ).model_dump()
+
+    return {
+        "phase": "screening",
+        "satellites": processed_sats,
+        "messages": state.get("messages", []) + [msg],
+        "websocket_events": state.get("websocket_events", []) + [ws_event]
+    }
