@@ -1,131 +1,70 @@
-import React, { useEffect, useRef } from 'react';
-import { useSpaceStore } from './store';
+import React, { useEffect } from 'react';
 import { Globe } from './components/Globe/Globe';
 import { MetricsBar } from './components/MetricsBar/MetricsBar';
 import { EventFeed } from './components/EventFeed/EventFeed';
 import { HITLPanel } from './components/HITLPanel/HITLPanel';
+import { useWebSocket } from './hooks/useWebSocket';
+import { useSpaceStore } from './store/useSpaceStore';
+import { Rocket } from 'lucide-react';
 
 function App() {
-  const wsRef = useRef<WebSocket | null>(null);
-  const { 
-    updateSatellites, 
-    addFeedEvent, 
-    setHitlRequest,
-    updateMetrics,
-  } = useSpaceStore();
+  const { updateSatellites, setActiveConjunctions, updateMetrics } = useSpaceStore();
+  useWebSocket();
 
   useEffect(() => {
-    // 1. Initial fetch for metrics
-    fetch('http://127.0.0.1:8000/api/metrics')
+    fetch('/api/satellites')
       .then(res => res.json())
-      .then(data => {
-        updateMetrics({
-          activeSatellitesCount: data.active_satellites,
-          conjunctionsDetected: data.conjunctions_detected,
-          conjunctionsResolved: data.conjunctions_resolved,
-          maneuversExecuted: data.maneuvers_executed,
-          totalDeltaV: data.total_delta_v,
-          systemStatus: data.system_status
-        });
-      })
+      .then(data => updateSatellites(data))
       .catch(console.error);
 
-    // 2. Initial fetch for active conjunctions
-    fetch('http://127.0.0.1:8000/api/conjunctions')
+    fetch('/api/conjunctions')
       .then(res => res.json())
-      .then(data => {
-        useSpaceStore.setState({ activeConjunctions: data });
-      })
+      .then(data => setActiveConjunctions(data))
       .catch(console.error);
 
-    // 3. Connect WebSocket
-    const connectWs = () => {
-      const ws = new WebSocket('ws://127.0.0.1:8000/ws');
-      wsRef.current = ws;
-
-      ws.onopen = () => console.log('WebSocket connected');
-      ws.onclose = () => {
-        console.log('WebSocket disconnected, reconnecting...');
-        setTimeout(connectWs, 2000);
-      };
-      ws.onerror = (e) => console.error('WebSocket error', e);
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          
-          switch (msg.type) {
-            case 'satellite_update':
-              updateSatellites(msg.payload.satellites);
-              break;
-              
-            case 'conjunction_detected':
-              addFeedEvent(msg);
-              // Refresh conjunctions and metrics
-              fetch('http://127.0.0.1:8000/api/conjunctions')
-                .then(res => res.json())
-                .then(data => useSpaceStore.setState({ activeConjunctions: data }));
-              fetch('http://127.0.0.1:8000/api/metrics')
-                .then(res => res.json())
-                .then(data => updateMetrics({
-                  activeSatellitesCount: data.active_satellites,
-                  conjunctionsDetected: data.conjunctions_detected,
-                  conjunctionsResolved: data.conjunctions_resolved,
-                  maneuversExecuted: data.maneuvers_executed,
-                  totalDeltaV: data.total_delta_v
-                }));
-              break;
-              
-            case 'negotiation_update':
-              addFeedEvent(msg);
-              break;
-              
-            case 'hitl_request':
-              addFeedEvent(msg);
-              setHitlRequest(msg);
-              break;
-              
-            case 'maneuver_executed':
-              addFeedEvent(msg);
-              // Refresh conjunctions and metrics
-              fetch('http://127.0.0.1:8000/api/conjunctions')
-                .then(res => res.json())
-                .then(data => useSpaceStore.setState({ activeConjunctions: data }));
-              fetch('http://127.0.0.1:8000/api/metrics')
-                .then(res => res.json())
-                .then(data => updateMetrics({
-                  activeSatellitesCount: data.active_satellites,
-                  conjunctionsDetected: data.conjunctions_detected,
-                  conjunctionsResolved: data.conjunctions_resolved,
-                  maneuversExecuted: data.maneuvers_executed,
-                  totalDeltaV: data.total_delta_v
-                }));
-              break;
-
-            case 'system_status':
-              addFeedEvent(msg);
-              updateMetrics({ systemStatus: msg.payload.status });
-              break;
-          }
-        } catch (e) {
-          console.error("Failed to parse WS message", e);
+    fetch('/api/metrics')
+      .then(res => res.json())
+      .then(data => updateMetrics({
+        metrics: {
+          active_satellites: data.active_satellites,
+          conjunctions_detected: data.conjunctions_detected,
+          resolved: data.resolved,
+          maneuvers_executed: data.maneuvers_executed,
+          total_delta_v: data.total_delta_v,
+          system_status: data.system_status
         }
-      };
-    };
+      }))
+      .catch(console.error);
+  }, [updateSatellites, setActiveConjunctions, updateMetrics]);
 
-    connectWs();
-
-    return () => {
-      if (wsRef.current) wsRef.current.close();
-    };
-  }, []);
+  const handleDemoInject = async () => {
+    try {
+      await fetch('/api/demo/inject', { method: 'POST' });
+    } catch (e) {
+      console.error("Failed to inject demo", e);
+    }
+  };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-black text-white">
-      <Globe />
+    <div className="w-screen h-screen flex flex-col bg-[#0a0f1e] text-white overflow-hidden relative">
       <MetricsBar />
-      <EventFeed />
-      <HITLPanel />
+      <div className="flex-1 flex flex-row overflow-hidden">
+        <div className="flex-1 relative">
+          <Globe />
+          
+          <button 
+            onClick={handleDemoInject}
+            className="absolute top-4 right-4 z-50 flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded shadow-lg border border-red-400 transition-colors"
+          >
+            <Rocket className="w-4 h-4" />
+            <span>⚡ INJECT CONJUNCTION</span>
+          </button>
+        </div>
+        <div className="w-80 border-l border-white/10 flex flex-col bg-black/40">
+          <EventFeed />
+          <HITLPanel />
+        </div>
+      </div>
     </div>
   );
 }
