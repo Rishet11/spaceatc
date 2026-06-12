@@ -95,9 +95,23 @@ async def run_pipeline(session_id: str) -> AgentState:
     state = initial_state(session_id)
     config = {"configurable": {"thread_id": session_id}}
     
-    # Start the graph
-    result = await app.ainvoke(state, config=config)
-    return result
+    from backend.main import broadcast_queue
+
+    # Initialize the graph
+    await app.aupdate_state(config, state)
+
+    # Use stream_mode="values" to process state changes after each node
+    async for chunk in app.astream(None, config=config, stream_mode="values"):
+        events = chunk.get("websocket_events", [])
+        for event in events:
+            await broadcast_queue.put(event)
+            
+        if events:
+            # Drain the events from the graph state
+            await app.aupdate_state(config, {"websocket_events": []})
+
+    final_state = await app.aget_state(config)
+    return final_state.values
 
 async def resume_after_hitl(session_id: str, decision: str) -> AgentState:
     """
@@ -107,16 +121,18 @@ async def resume_after_hitl(session_id: str, decision: str) -> AgentState:
     app = await get_graph()
     config = {"configurable": {"thread_id": session_id}}
     
-    # Update the state with the human decision
-    # (Since we are interrupted, we can update state via ainvoke by passing just the diff,
-    #  but in langgraph passing a partial dict updates the state depending on the reducer.
-    #  Since we use TypedDict, usually it overwrites keys).
     update_data = {"hitl_decision": decision}
-    
-    # Some langgraph versions use update_state, but we can also just run it
-    # We will use ainvoke with the state patch, or update_state.
     await app.aupdate_state(config, update_data)
     
-    # Resume the graph
-    result = await app.ainvoke(None, config=config)
-    return result
+    from backend.main import broadcast_queue
+
+    async for chunk in app.astream(None, config=config, stream_mode="values"):
+        events = chunk.get("websocket_events", [])
+        for event in events:
+            await broadcast_queue.put(event)
+            
+        if events:
+            await app.aupdate_state(config, {"websocket_events": []})
+            
+    final_state = await app.aget_state(config)
+    return final_state.values

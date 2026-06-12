@@ -43,7 +43,19 @@ async def execute_maneuver(state: AgentState) -> dict:
             "maneuver_count": maneuvering_sat["maneuver_count"]
         })
         
+        # Inject artificial drift to visual globe (simulate delta-V)
+        from backend.api.routes import sat_cache
+        nid = maneuvering_sat["norad_id"]
+        if nid in sat_cache:
+            sat_cache[nid]["maneuver_time"] = datetime.now(tz=timezone.utc)
+            sat_cache[nid]["lat_offset_rate"] = 0.005 # deg/sec
+            sat_cache[nid]["alt_offset_rate"] = 0.5   # km/sec
+        
     msg = f"[Executor] Executed maneuver for {winning_proposal['satellite_name']} (dv={winning_proposal['delta_v_ms']} m/s). Conjunction resolved."
+    
+    # Retrieve original conjunction info
+    active_conjunctions = state.get("active_conjunctions", [])
+    current_event = next((c for c in active_conjunctions if c["event_id"] == event_id), {})
     
     # 3. Queue maneuver_executed WS event
     ws_event = WSMessage.now(
@@ -53,8 +65,10 @@ async def execute_maneuver(state: AgentState) -> dict:
             "satellite_name": winning_proposal["satellite_name"],
             "operator": winning_proposal["operator"],
             "delta_v_ms": winning_proposal["delta_v_ms"],
-            "post_maneuver_pc": winning_proposal["post_maneuver_pc"],
-            "post_maneuver_miss_km": winning_proposal["post_maneuver_miss_km"],
+            "pc_before": current_event.get("pc", 0.0),
+            "pc_after": winning_proposal["post_maneuver_pc"],
+            "miss_km_before": current_event.get("miss_distance_km", 0.0),
+            "miss_km_after": winning_proposal["post_maneuver_miss_km"],
             "burn_time": winning_proposal["burn_time"]
         }
     ).model_dump()

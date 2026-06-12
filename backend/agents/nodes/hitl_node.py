@@ -4,8 +4,6 @@ backend/agents/nodes/hitl_node.py — Node 5: Wait for human-in-the-loop approva
 
 import logging
 
-from langgraph.types import interrupt
-
 from backend.agents.state import AgentState
 from backend.api.schemas import WSMessage, WSMessageType
 
@@ -17,6 +15,10 @@ async def await_hitl(state: AgentState) -> dict:
     """
     logger.info("Node: await_hitl starting...")
     
+    if state.get("hitl_decision"):
+        logger.info(f"Resuming with decision: {state.get('hitl_decision')}")
+        return {"phase": "hitl_resolved"}
+        
     winning_proposal = state.get("winning_proposal")
     if not winning_proposal:
         return {"phase": "resolved"}
@@ -38,10 +40,7 @@ async def await_hitl(state: AgentState) -> dict:
         "websocket_events": state.get("websocket_events", []) + [ws_event]
     }
     
-    # In LangGraph 0.1+, interrupt() pauses execution. 
-    # When resumed, the graph continues from the *next* node or returns here based on how we structure it.
-    # Usually you yield state, then call interrupt(), but inside a node function 
-    # we just call it. LangGraph captures the exception and pauses.
-    interrupt("Awaiting human approval")
-    
+    # In LangGraph, since we use interrupt_before=["await_hitl"], the graph pauses 
+    # *before* entering this node. When we call astream(None) to resume, this node 
+    # executes. We just return the updated state to pass through to execute_maneuver.
     return updated_state

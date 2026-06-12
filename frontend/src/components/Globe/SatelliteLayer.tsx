@@ -4,7 +4,10 @@ import { useSpaceStore } from '../../store/useSpaceStore';
 
 export const SatelliteLayer: React.FC = () => {
   const satellites = useSpaceStore(state => state.satellites);
-  const satsArray = Object.values(satellites).filter(s => s.lat !== undefined && s.lon !== undefined && s.alt_km !== undefined);
+  const destroyedSatellites = useSpaceStore(state => state.destroyedSatellites);
+  const satsArray = Object.values(satellites).filter(s => 
+    s.lat !== undefined && s.lon !== undefined && s.alt_km !== undefined && !destroyedSatellites.includes(s.name)
+  );
   
   const normalSats = satsArray.filter(s => !s.is_highlighted && !s.name?.includes("DEMO"));
   const highlightSats = satsArray.filter(s => s.is_highlighted || s.name?.includes("DEMO"));

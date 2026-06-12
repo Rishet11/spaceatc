@@ -5,24 +5,10 @@ import { ShieldAlert, CheckCircle2, Rocket, Zap } from 'lucide-react';
 export const MetricsBar: React.FC = () => {
   const { metrics } = useSpaceStore();
 
-  const handleDemoInject = async () => {
-    try {
-      await fetch('http://127.0.0.1:8000/api/demo/inject', { method: 'POST' });
-    } catch (e) {
-      console.error("Failed to inject demo", e);
-    }
-  };
-
   return (
     <div className="w-full h-12 bg-[#0a0f1e] border-b border-white/10 flex items-center justify-between px-6 shrink-0 z-50">
       <div className="flex items-center space-x-3">
         <h1 className="text-xl font-bold tracking-wider text-white">SpaceATC</h1>
-        <button 
-          onClick={handleDemoInject}
-          className="ml-4 bg-white/10 hover:bg-white/20 transition-colors border border-white/20 rounded px-3 py-1 text-xs font-semibold"
-        >
-          Demo Inject
-        </button>
       </div>
 
       <div className="flex items-center space-x-6 text-sm font-medium">

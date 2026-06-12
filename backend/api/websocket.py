@@ -22,10 +22,19 @@ class ConnectionManager:
             logger.info(f"WebSocket disconnected. Total active: {len(self.active_connections)}")
 
     async def broadcast(self, message: dict):
+        import json
+        class DateTimeEncoder(json.JSONEncoder):
+            def default(self, obj):
+                if hasattr(obj, 'isoformat'):
+                    return obj.isoformat()
+                return super().default(obj)
+                
+        msg_str = json.dumps(message, cls=DateTimeEncoder)
+        
         # Create a copy of the list to iterate safely
         for connection in list(self.active_connections):
             try:
-                await connection.send_json(message)
+                await connection.send_text(msg_str)
             except Exception as e:
                 logger.error(f"Error sending to WS client, removing connection: {e}")
                 self.disconnect(connection)

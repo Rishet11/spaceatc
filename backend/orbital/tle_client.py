@@ -145,8 +145,12 @@ async def fetch_and_parse(url: str = CELESTRAK_STARLINK_TLE) -> list[tuple[str, 
     Returns:
         List of (name, Satrec) tuples.
     """
-    tle_text = await fetch_tle_group(url)
-    return parse_tle_block(tle_text)
+    try:
+        tle_text = await fetch_tle_group(url)
+        return parse_tle_block(tle_text)
+    except Exception as e:
+        logger.error(f"Failed to fetch and parse TLEs: {e}")
+        return []
 
 
 # ---------------------------------------------------------------------------

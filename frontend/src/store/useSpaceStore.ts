@@ -26,6 +26,8 @@ export interface SpaceState {
   addFeedEvent: (event: EventLogItem) => void;
   setHitlRequest: (req: WSMessageHitlRequest | null) => void;
   setActiveConjunctions: (conjunctions: ConjunctionEvent[]) => void;
+  destroyedSatellites: string[];
+  addDestroyedSatellites: (names: string[]) => void;
 }
 
 export const useSpaceStore = create<SpaceState>((set) => ({
@@ -33,6 +35,7 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   activeConjunctions: [],
   currentHitlRequest: null,
   eventFeed: [],
+  destroyedSatellites: [],
   
   metrics: {
     active_satellites: 0,
@@ -69,5 +72,8 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   })),
 
   setHitlRequest: (req) => set({ currentHitlRequest: req }),
-  setActiveConjunctions: (conjunctions) => set({ activeConjunctions: conjunctions })
+  setActiveConjunctions: (conjunctions) => set({ activeConjunctions: conjunctions }),
+  addDestroyedSatellites: (names) => set((state) => ({ 
+    destroyedSatellites: [...state.destroyedSatellites, ...names] 
+  }))
 }));

@@ -1,1 +1,5 @@
-// frontend/src/hooks/useSatellites.ts
+import * as satellite from 'satellite.js';
+
+export const useSatellites = () => {
+  // Hook logic goes here
+};

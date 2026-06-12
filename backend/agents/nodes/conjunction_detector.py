@@ -42,7 +42,7 @@ async def detect_conjunctions(state: AgentState) -> dict:
                 
             pairs_checked += 1
             
-            # 2. Call find_tca placeholder
+            # 2. Call find_tca — real SGP4 coarse scan + scipy refinement
             from backend.api.routes import sat_cache
             sat1_cache = sat_cache.get(sat1["norad_id"])
             sat2_cache = sat_cache.get(sat2["norad_id"])
@@ -98,11 +98,10 @@ async def detect_conjunctions(state: AgentState) -> dict:
                     "event_id": event_id,
                     "sat_primary": sat1["name"],
                     "sat_secondary": sat2["name"],
-                    "operator_primary": sat1["operator"],
-                    "operator_secondary": sat2["operator"],
+                    "tca_iso": c_out.tca.isoformat(),
+                    "miss_distance_km": c_out.miss_distance_km,
                     "pc": c_out.pc,
-                    "tca": c_out.tca.isoformat(),
-                    "miss_distance_km": c_out.miss_distance_km
+                    "relative_velocity_km_s": c_out.relative_velocity_km_s
                 }
                 
                 ws_events.append(WSMessage.now(

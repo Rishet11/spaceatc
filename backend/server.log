@@ -1,0 +1,343 @@
+INFO:     Will watch for changes in these directories: ['/Users/rishetmehra/Desktop/Faraway/backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [4944] using StatReload
+INFO:     Started server process [5046]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:50198 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50200 - "GET /api/satellites HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50202 - "GET /api/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50567 - "WebSocket /ws" [accepted]
+INFO:backend.api.websocket:WebSocket connected. Total active: 1
+INFO:     connection open
+INFO:     127.0.0.1:50575 - "GET /api/conjunctions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50578 - "GET /api/conjunctions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50576 - "GET /api/satellites HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50574 - "GET /api/satellites HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50579 - "GET /api/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50577 - "GET /api/metrics HTTP/1.1" 200 OK
+INFO:backend.agents.graph:Starting pipeline for session: demo_session
+INFO:backend.agents.nodes.tle_ingestion:Node: ingest_tle starting...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 200 OK"
+INFO:backend.orbital.tle_client:Fetched 1729.9 kB — approx 10543 satellites
+INFO:backend.orbital.tle_client:Parsed 10544 satellites from TLE block
+INFO:backend.agents.nodes.conjunction_detector:Node: detect_conjunctions starting...
+INFO:backend.agents.nodes.negotiation_coordinator:Node: coordinate_negotiation starting...
+INFO:backend.agents.nodes.operator_agent:Node: generate_operator_bid starting...
+ERROR:backend.agents.nodes.operator_agent:Gemini API call failed: No module named 'google'
+INFO:     127.0.0.1:50582 - "POST /api/demo/inject HTTP/1.1" 200 OK
+WARNING:langgraph.checkpoint.serde.jsonplus:Deserializing unregistered type backend.api.schemas.WSMessageType from checkpoint. This will be blocked in a future version. Set LANGGRAPH_STRICT_MSGPACK=true to block now, or add to allowed_msgpack_modules to allow explicitly: [('backend.api.schemas', 'WSMessageType')]
+INFO:     127.0.0.1:50586 - "GET /api/metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50590 - "GET /api/conjunctions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50592 - "GET /api/metrics HTTP/1.1" 200 OK
+INFO:backend.agents.graph:Starting pipeline for session: demo_session
+INFO:backend.agents.nodes.tle_ingestion:Node: ingest_tle starting...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:backend.agents.graph:Starting pipeline for session: demo_session
+INFO:backend.agents.nodes.tle_ingestion:Node: ingest_tle starting...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:backend.agents.nodes.conjunction_detector:Node: detect_conjunctions starting...
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:backend.agents.nodes.negotiation_coordinator:Node: coordinate_negotiation starting...
+INFO:backend.agents.nodes.operator_agent:Node: generate_operator_bid starting...
+ERROR:backend.agents.nodes.operator_agent:Gemini API call failed: No module named 'google'
+INFO:     127.0.0.1:50595 - "POST /api/demo/inject HTTP/1.1" 200 OK
+INFO:backend.agents.nodes.conjunction_detector:Node: detect_conjunctions starting...
+INFO:backend.agents.nodes.negotiation_coordinator:Node: coordinate_negotiation starting...
+INFO:backend.agents.nodes.operator_agent:Node: generate_operator_bid starting...
+ERROR:backend.agents.nodes.operator_agent:Gemini API call failed: No module named 'google'
+INFO:     127.0.0.1:50599 - "POST /api/demo/inject HTTP/1.1" 200 OK
+INFO:backend.agents.graph:Resuming pipeline for session demo_session with decision: approve
+INFO:backend.agents.nodes.hitl_node:Node: await_hitl starting...
+INFO:     127.0.0.1:50604 - "POST /api/hitl/10327f1b-fa7a-41df-8e29-b5485f2ab802/approve HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:backend.api.websocket:WebSocket disconnected. Total active: 0
+INFO:     connection closed
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5046]
+INFO:     Started server process [33980]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'agents/graph.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [33980]
+INFO:     Started server process [34205]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'agents/nodes/tle_ingestion.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [34205]
+INFO:     Started server process [34221]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'agents/nodes/conjunction_detector.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [34221]
+INFO:     Started server process [34337]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'agents/nodes/operator_agent.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [34337]
+INFO:     Started server process [34457]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'agents/nodes/maneuver_executor.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [34457]
+INFO:     Started server process [34571]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'api/routes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [34571]
+INFO:     Started server process [37704]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'api/routes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [37704]
+INFO:     Started server process [37832]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:50955 - "WebSocket /ws" [accepted]
+INFO:backend.api.websocket:WebSocket connected. Total active: 1
+INFO:     connection open
+INFO:backend.agents.graph:Starting pipeline for session: demo_session
+WARNING:langgraph.checkpoint.serde.jsonplus:Deserializing unregistered type backend.api.schemas.WSMessageType from checkpoint. This will be blocked in a future version. Set LANGGRAPH_STRICT_MSGPACK=true to block now, or add to allowed_msgpack_modules to allow explicitly: [('backend.api.schemas', 'WSMessageType')]
+INFO:backend.agents.nodes.hitl_node:Node: await_hitl starting...
+INFO:     127.0.0.1:50958 - "POST /api/demo/inject HTTP/1.1" 200 OK
+INFO:backend.agents.graph:Starting pipeline for session: demo_session
+INFO:     127.0.0.1:50961 - "POST /api/demo/inject HTTP/1.1" 200 OK
+INFO:backend.agents.graph:Starting pipeline for session: demo_session
+INFO:     127.0.0.1:50964 - "POST /api/demo/inject HTTP/1.1" 200 OK
+INFO:backend.agents.graph:Starting pipeline for session: demo_session
+INFO:     127.0.0.1:50967 - "POST /api/demo/inject HTTP/1.1" 200 OK
+INFO:backend.agents.graph:Starting pipeline for session: demo_session
+INFO:     127.0.0.1:50970 - "POST /api/demo/inject HTTP/1.1" 200 OK
+INFO:backend.api.websocket:WebSocket disconnected. Total active: 0
+INFO:     connection closed
+WARNING:  StatReload detected changes in 'agents/nodes/tle_ingestion.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [37832]
+INFO:     Started server process [42765]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'agents/nodes/operator_agent.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [42765]
+INFO:     Started server process [48263]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'agents/nodes/hitl_node.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [48263]
+INFO:     Started server process [48381]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'agents/nodes/hitl_node.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [48381]
+INFO:     Started server process [48395]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'api/routes.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [48395]
+INFO:     Started server process [48611]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'agents/graph.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [48611]
+INFO:     Started server process [48725]
+INFO:     Waiting for application startup.
+INFO:main:Initializing DB...
+INFO:backend.db.store:Database initialised at ./spaceatc.db
+INFO:main:Fetching TLEs...
+INFO:backend.orbital.tle_client:Fetching TLE data from https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE
+INFO:httpx:HTTP Request: GET https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE "HTTP/1.1 403 Forbidden"
+WARNING:backend.orbital.tle_client:Failed to fetch TLE from CelesTrak: Client error '403 Forbidden' for url 'https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=TLE'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/403. Attempting fallback to local cache...
+INFO:backend.orbital.tle_client:Successfully loaded TLE data from local cache (starlink_cache.tle) — approx 9 satellites
+INFO:backend.orbital.tle_client:Parsed 10 satellites from TLE block
+INFO:main:Loaded 10 satellites into DB and cache.
+INFO:     Application startup complete.

@@ -33,7 +33,7 @@ export const HITLPanel: React.FC = () => {
 
   const handleAction = async (decision: 'approve' | 'veto') => {
     try {
-      await fetch(`http://127.0.0.1:8000/api/hitl/${event_id}/${decision}`, { method: 'POST' });
+      await fetch(`http://localhost:8000/api/hitl/${event_id}/${decision}`, { method: 'POST' });
     } catch (e) {
       console.error(`Failed to ${decision}`, e);
     }

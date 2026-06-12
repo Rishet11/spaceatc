@@ -69,19 +69,25 @@ async def get_single_conjunction(event_id: str):
 
 @router.get("/api/metrics")
 async def get_metrics():
+    from backend.db.store import get_proposals_for_event
     sats = await get_all_satellites()
     events = await get_all_conjunctions()
-    
+
     resolved = [e for e in events if e["status"] == "resolved"]
-    
-    # Fake total_delta_v for demo since it's hard to aggregate quickly here
-    # (requires querying proposals for resolved events)
-    total_dv = sum([0.1 for _ in resolved]) 
-    
+
+    # Sum delta-V from proposals for resolved events
+    total_dv = 0.0
+    for ev in resolved:
+        proposals = await get_proposals_for_event(ev["event_id"])
+        if proposals:
+            # Pick the winning (lowest bid_score) proposal
+            best = min(proposals, key=lambda p: p["bid_score"])
+            total_dv += best["delta_v_ms"]
+
     return MetricsResponse(
         active_satellites=len(sats),
         conjunctions_detected=len(events),
-        conjunctions_resolved=len(resolved),
+        resolved=len(resolved),
         maneuvers_executed=len(resolved),
         total_delta_v=total_dv,
         system_status="ACTIVE"
@@ -91,12 +97,49 @@ async def get_metrics():
 async def demo_reset():
     import aiosqlite
     from backend.config import settings
-    # For demo reset, we just clear the DB tables.
+    # For demo reset, we clear DB tables and LangGraph checkpoints
     async with aiosqlite.connect(settings.sqlite_path) as db:
         await db.execute("DELETE FROM conjunctions")
         await db.execute("DELETE FROM proposals")
+        await db.execute("DELETE FROM checkpoints")
+        await db.execute("DELETE FROM writes")
         await db.commit()
     return {"status": "reset"}
+
+def generate_conjunction_tle_pair(epoch_dt: datetime) -> tuple[tuple[str, str, str], tuple[str, str, str]]:
+    # Year: 2 digit. e.g., 2026 -> 26
+    year_str = str(epoch_dt.year)[-2:]
+    
+    # Day of year and fraction.
+    jan1 = datetime(epoch_dt.year, 1, 1, tzinfo=timezone.utc)
+    delta = epoch_dt - jan1
+    day_frac = delta.total_seconds() / 86400.0 + 1.0
+    
+    # Format: YY + day_frac (000.00000000 format, total 14 characters)
+    epoch_str = f"{year_str}{day_frac:012.8f}"
+    
+    # Base elements:
+    inc = "53.0500"
+    raan_a = 0.0
+    ecc = "0001000"
+    argp = 0.0
+    ma_a = 0.0
+    mm = "15.30000000"
+    
+    def format_angle(deg):
+        return f"{deg:8.4f}".rjust(8, ' ')
+        
+    line1_a = f"1 99001U 24001A   {epoch_str}  .00000000  00000-0  00000-0 0  9999"
+    line2_a = f"2 99001  {inc} {format_angle(raan_a)} {ecc} {format_angle(argp)} {format_angle(ma_a)} {mm}    00"
+    
+    raan_b = raan_a + 0.01
+    ma_b = ma_a - 0.005
+    if ma_b < 0: ma_b += 360.0
+    
+    line1_b = f"1 99002U 24001B   {epoch_str}  .00000000  00000-0  00000-0 0  9999"
+    line2_b = f"2 99002  {inc} {format_angle(raan_b)} {ecc} {format_angle(argp)} {format_angle(ma_b)} {mm}    00"
+    
+    return ("DEMO-SAT-A", line1_a, line2_a), ("DEMO-SAT-B", line1_b, line2_b)
 
 @router.post("/api/demo/inject")
 async def demo_inject():
@@ -107,26 +150,21 @@ async def demo_inject():
     4. Return event_id.
     """
     # 1. Create TLEs
-    # Base TLE from Starlink (approx 550km, 53deg inc)
-    line1_a = "1 99998U 20001A   23001.00000000  .00000000  00000-0  00000-0 0  9998"
-    line2_a = "2 99998  53.0500   0.0000 0001000   0.0000   0.0000 15.06000000    06"
-    
-    line1_b = "1 99999U 20001B   23001.00000000  .00000000  00000-0  00000-0 0  9999"
-    # Offset mean anomaly by 0.001 degrees
-    line2_b = "2 99999  53.0500   0.0000 0001000   0.0000   0.0010 15.06000000    06"
+    dt = datetime.now(tz=timezone.utc)
+    (name_a, line1_a, line2_a), (name_b, line1_b, line2_b) = generate_conjunction_tle_pair(dt)
 
     # 2. Upsert to DB
     demo_a = {
-        "norad_id": "99998",
-        "name": "DEMO-SAT-A",
+        "norad_id": "99001",
+        "name": name_a,
         "operator": "Demo_A",
         "fuel_units": 100.0,
         "maneuver_count": 0,
         "omm_json": json.dumps({"line1": line1_a, "line2": line2_a})
     }
     demo_b = {
-        "norad_id": "99999",
-        "name": "DEMO-SAT-B",
+        "norad_id": "99002",
+        "name": name_b,
         "operator": "Demo_B",
         "fuel_units": 100.0,
         "maneuver_count": 0,
@@ -139,8 +177,8 @@ async def demo_inject():
     # Store them in cache for propagation
     satrec_a = Satrec.twoline2rv(line1_a, line2_a)
     satrec_b = Satrec.twoline2rv(line1_b, line2_b)
-    sat_cache["99998"] = {"satrec": satrec_a}
-    sat_cache["99999"] = {"satrec": satrec_b}
+    sat_cache["99001"] = {"satrec": satrec_a}
+    sat_cache["99002"] = {"satrec": satrec_b}
     
     # 3. Run full pipeline
     session_id = "demo_session"
@@ -153,7 +191,7 @@ async def demo_inject():
             event_id = ev["event_id"]
             break
             
-    return {"status": "injected", "event_id": event_id, "session_id": session_id}
+    return {"status": "injected", "event_id": event_id, "expected_tca_seconds": 120}
 
 @router.post("/api/hitl/{event_id}/approve")
 async def hitl_approve(event_id: str):

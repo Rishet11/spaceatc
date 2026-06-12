@@ -10,6 +10,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from backend.db.store import init_db, upsert_satellite
 from backend.orbital.tle_client import fetch_and_parse, CELESTRAK_STARLINK_TLE
 from backend.orbital.propagator import propagate_at, eci_to_geodetic
@@ -37,8 +41,14 @@ async def broadcast_satellite_positions():
                 satrec = data["satrec"]
                 pos, vel = propagate_at(satrec, now)
                 
-                if pos:
+                if pos is not None:
                     lat, lon, alt = eci_to_geodetic(pos, now)
+                    
+                    if "maneuver_time" in data:
+                        dt = (now - data["maneuver_time"]).total_seconds()
+                        lat += data.get("lat_offset_rate", 0.0) * dt
+                        lon += data.get("lon_offset_rate", 0.0) * dt
+                        alt += data.get("alt_offset_rate", 0.0) * dt
                     
                     # Update cache so REST API sees it too
                     data["position"] = pos
@@ -48,6 +58,8 @@ async def broadcast_satellite_positions():
                     
                     positions.append({
                         "norad_id": nid,
+                        "name": data.get("name", nid),
+                        "operator": data.get("operator", "Unknown"),
                         "position": pos,
                         "lat": lat,
                         "lon": lon,
@@ -64,30 +76,17 @@ async def broadcast_satellite_positions():
         except Exception as e:
             logger.error(f"Error in satellite propagation task: {e}")
 
+broadcast_queue: asyncio.Queue = asyncio.Queue()
+
 async def drain_agent_ws_events():
-    """Background task: drain websocket_events from agent state."""
-    seen_events = 0
-    config = {"configurable": {"thread_id": "demo_session"}}
-    
+    """Background task: drain websocket_events from global queue."""
     while True:
         try:
-            await asyncio.sleep(1)
-            app = await get_graph()
-            
-            # Use get_state to peek at the current state of the demo session
-            state_snapshot = await app.aget_state(config)
-            if state_snapshot and state_snapshot.values:
-                events = state_snapshot.values.get("websocket_events", [])
-                
-                # Broadcast any new events
-                if len(events) > seen_events:
-                    for ev in events[seen_events:]:
-                        await manager.broadcast(ev)
-                    seen_events = len(events)
-                    
-        except Exception as e:
-            # Graph might not be initialized yet or session doesn't exist
+            message = broadcast_queue.get_nowait()
+            await manager.broadcast(message)
+        except asyncio.QueueEmpty:
             pass
+        await asyncio.sleep(0.1)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -117,7 +116,11 @@ async def lifespan(app: FastAPI):
                 "omm_json": "{}"
             }
             await upsert_satellite(sat_dict)
-            sat_cache[nid] = {"satrec": satrec}
+            sat_cache[nid] = {
+                "satrec": satrec,
+                "name": name,
+                "operator": op,
+            }
             
         logger.info(f"Loaded {len(top_100)} satellites into DB and cache.")
     except Exception as e:

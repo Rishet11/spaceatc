@@ -68,10 +68,10 @@ async def ingest_tle(state: AgentState) -> dict:
         
     # Inject DEMO sats if they exist in sat_cache
     from backend.api.routes import sat_cache
-    for nid in ["99998", "99999"]:
+    for nid in ["99001", "99002"]:
         if nid in sat_cache:
-            op = "Demo_A" if nid == "99998" else "Demo_B"
-            name = "DEMO-SAT-A" if nid == "99998" else "DEMO-SAT-B"
+            op = "Demo_A" if nid == "99001" else "Demo_B"
+            name = "DEMO-SAT-A" if nid == "99001" else "DEMO-SAT-B"
             processed_sats.insert(0, { # Insert at beginning so they are in top 20
                 "norad_id": nid,
                 "name": name,
@@ -85,7 +85,7 @@ async def ingest_tle(state: AgentState) -> dict:
     # 4. Queue system_status WS event
     ws_event = WSMessage.now(
         type_=WSMessageType.system_status,
-        payload={"status": "ACTIVE", "message": msg}
+        payload={"status": "ACTIVE", "satellites_loaded": len(processed_sats)}
     ).model_dump()
 
     return {
