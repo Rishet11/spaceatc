@@ -43,9 +43,15 @@ async def detect_conjunctions(state: AgentState) -> dict:
             pairs_checked += 1
             
             # 2. Call find_tca placeholder
+            from backend.api.routes import sat_cache
+            sat1_cache = sat_cache.get(sat1["norad_id"])
+            sat2_cache = sat_cache.get(sat2["norad_id"])
+            if not sat1_cache or not sat2_cache:
+                continue
+                
             c_input = ConjunctionInput(
-                sat1_satrec=sat1["satrec"],
-                sat2_satrec=sat2["satrec"],
+                sat1_satrec=sat1_cache["satrec"],
+                sat2_satrec=sat2_cache["satrec"],
                 t_start=now,
                 t_end=t_end
             )

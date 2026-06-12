@@ -53,7 +53,6 @@ async def ingest_tle(state: AgentState) -> dict:
             "operator": op,
             "fuel_units": 100.0,
             "maneuver_count": 0,
-            # Placeholder for actual OMM JSON if needed later, but store requires it to be dict or string
             "omm_json": {"source": "celestrak", "type": "tle", "satnum": satrec.satnum} 
         }
         await upsert_satellite(sat_dict)
@@ -63,10 +62,23 @@ async def ingest_tle(state: AgentState) -> dict:
             "norad_id": str(satrec.satnum),
             "name": name,
             "operator": op,
-            "satrec": satrec,
             "fuel_units": 100.0,
             "maneuver_count": 0
         })
+        
+    # Inject DEMO sats if they exist in sat_cache
+    from backend.api.routes import sat_cache
+    for nid in ["99998", "99999"]:
+        if nid in sat_cache:
+            op = "Demo_A" if nid == "99998" else "Demo_B"
+            name = "DEMO-SAT-A" if nid == "99998" else "DEMO-SAT-B"
+            processed_sats.insert(0, { # Insert at beginning so they are in top 20
+                "norad_id": nid,
+                "name": name,
+                "operator": op,
+                "fuel_units": 100.0,
+                "maneuver_count": 0
+            })
 
     msg = f"[TLE Ingestion] Loaded {len(processed_sats)} satellites."
     

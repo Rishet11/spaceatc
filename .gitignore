@@ -71,3 +71,4 @@ frontend/.cache/
 # ===========================
 .DS_Store
 Thumbs.db
+spaceatc.db*

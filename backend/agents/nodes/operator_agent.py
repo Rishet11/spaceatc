@@ -39,9 +39,13 @@ async def generate_operator_bid(state: AgentState) -> dict:
     # 2. Call compute_minimum_delta_v placeholder for each operator
     for i, (maneuvering_sat, other_sat) in enumerate([(sat1, sat2), (sat2, sat1)]):
         
+        from backend.api.routes import sat_cache
+        m_cache = sat_cache.get(maneuvering_sat["norad_id"], {})
+        o_cache = sat_cache.get(other_sat["norad_id"], {})
+        
         m_input = ManeuverInput(
-            sat_maneuvering_satrec=maneuvering_sat["satrec"],
-            sat_other_satrec=other_sat["satrec"],
+            sat_maneuvering_satrec=m_cache.get("satrec"),
+            sat_other_satrec=o_cache.get("satrec"),
             tca=tca,
             burn_lead_time_minutes=60
         )
