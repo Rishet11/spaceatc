@@ -70,6 +70,7 @@ class ManeuverOutput:
     burn_time: datetime
     post_maneuver_pc: float
     post_maneuver_miss_km: float
+    trace: list[dict]
 
 
 # ---------------------------------------------------------------------------
@@ -376,6 +377,10 @@ def compute_minimum_delta_v(input: ManeuverInput) -> ManeuverOutput:  # noqa: A0
     else:
         rel_v = 14.0  # fallback for typical LEO
 
+    trace = []
+    trace.append({"t": 0, "text": f"Burn time: {burn_time.strftime('%Y-%m-%dT%H:%M:%S')} UTC", "value": f"τ = {tau:.0f}s"})
+    trace.append({"t": 1, "text": "Mean motion (from TLE)", "value": f"n = {n:.6f} rad/s"})
+
     # ------------------------------------------------------------------
     # CW displacement from an along-track impulse
     # ------------------------------------------------------------------
@@ -391,6 +396,11 @@ def compute_minimum_delta_v(input: ManeuverInput) -> ManeuverOutput:  # noqa: A0
         dy = (4 * np.sin(n * tau) - 3 * n * tau) / n * dv_km_s
         dx = 2 * (1 - np.cos(n * tau)) / n * dv_km_s
         return float(np.sqrt(dx**2 + dy**2))
+
+    cy = (4*np.sin(n*tau) - 3*n*tau) / n
+    cx = 2*(1 - np.cos(n*tau)) / n
+    trace.append({"t": 2, "text": "CW along-track coefficient", "value": f"Cy = {cy:.1f} km/(km/s)"})
+    trace.append({"t": 3, "text": "CW radial coefficient", "value": f"Cx = {cx:.1f} km/(km/s)"})
 
     def new_miss_and_pc(dv_km_s: float) -> tuple:
         """Compute post-maneuver miss distance and Pc.
@@ -419,9 +429,18 @@ def compute_minimum_delta_v(input: ManeuverInput) -> ManeuverOutput:  # noqa: A0
     def find_min_dv() -> tuple:
         """Binary search returning (min_dv_km_s, final_miss_km, final_pc)."""
         dv_lo, dv_hi = 1e-5, 0.002  # km/s search bounds
+        iteration = 0
         for _ in range(25):          # 25 iterations → precision ~6e-8 km/s
             dv_mid = (dv_lo + dv_hi) / 2
             _, pc_mid = new_miss_and_pc(dv_mid)
+            if iteration < 8 or abs(dv_hi - dv_lo) < 0.0001:
+                trace.append({
+                    "t": 4 + iteration,
+                    "text": f"Binary search [{iteration+1}]",
+                    "value": f"ΔV={dv_mid*1000:.4f} m/s → Pc={pc_mid:.2e} {'✓' if pc_mid <= target_pc else '✗'}"
+                })
+            iteration += 1
+
             if pc_mid <= target_pc:
                 dv_hi = dv_mid
             else:
@@ -458,12 +477,17 @@ def compute_minimum_delta_v(input: ManeuverInput) -> ManeuverOutput:  # noqa: A0
     if final_miss <= original_miss:
         raise ValueError("Miss distance did not increase after maneuver")
 
+    trace.append({"t": 15, "text": "CONVERGED", "value": f"ΔV = {delta_v_ms:.3f} m/s ({burn_direction})"})
+    trace.append({"t": 16, "text": "Post-maneuver Pc", "value": f"{final_pc:.2e} \u2014 SAFE ✓"})
+    trace.append({"t": 17, "text": "Post-maneuver miss distance", "value": f"{final_miss:.3f} km"})
+
     return ManeuverOutput(
         delta_v_ms=delta_v_ms,
         burn_direction=burn_direction,
         burn_time=burn_time,
         post_maneuver_pc=final_pc,
         post_maneuver_miss_km=final_miss,
+        trace=trace,
     )
 
 

@@ -1,13 +1,16 @@
 import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Landing } from './pages/Landing';
 import { Globe } from './components/Globe/Globe';
 import { MetricsBar } from './components/MetricsBar/MetricsBar';
 import { EventFeed } from './components/EventFeed/EventFeed';
 import { HITLPanel } from './components/HITLPanel/HITLPanel';
+import { MathPanel } from './components/MathPanel/MathPanel';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useSpaceStore } from './store/useSpaceStore';
 import { Rocket } from 'lucide-react';
 
-function App() {
+function Dashboard() {
   const { updateSatellites, setActiveConjunctions, updateMetrics } = useSpaceStore();
   useWebSocket();
 
@@ -62,10 +65,22 @@ function App() {
         </div>
         <div className="w-80 border-l border-white/10 flex flex-col bg-black/40">
           <EventFeed />
-          <HITLPanel />
         </div>
       </div>
+      <HITLPanel />
+      <MathPanel />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

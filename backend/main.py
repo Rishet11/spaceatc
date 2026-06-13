@@ -4,8 +4,23 @@ backend/main.py — FastAPI Application Entrypoint
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+import time as time_module
+from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
+
+# ---------------------------------------------------------------------------
+# Simulation time warp
+# ---------------------------------------------------------------------------
+SIM_SPEED: float = 60.0        # default: 60× (1 real sec = 1 orbital minute)
+SIM_START_REAL: float = 0.0    # set on startup
+SIM_START_UTC: datetime = datetime.utcnow()  # set on startup
+
+
+def get_sim_time() -> datetime:
+    """Return the current simulation time (accelerated by SIM_SPEED)."""
+    elapsed_real = time_module.time() - SIM_START_REAL
+    elapsed_sim = elapsed_real * SIM_SPEED
+    return SIM_START_UTC + timedelta(seconds=elapsed_sim)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,14 +42,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 async def broadcast_satellite_positions():
-    """Background task: propagate satellites every 5s and broadcast."""
+    """Background task: propagate satellites every 2s and broadcast."""
+    last_metrics_time = 0.0
     while True:
         try:
-            await asyncio.sleep(5)
+            await asyncio.sleep(2)
             if not sat_cache:
                 continue
-                
-            now = datetime.now(tz=timezone.utc)
+
+            # Use simulation time for SGP4 propagation
+            now = get_sim_time().replace(tzinfo=timezone.utc)
             positions = []
             
             for nid, data in sat_cache.items():
@@ -44,11 +61,10 @@ async def broadcast_satellite_positions():
                 if pos is not None:
                     lat, lon, alt = eci_to_geodetic(pos, now)
                     
-                    if "maneuver_time" in data:
-                        dt = (now - data["maneuver_time"]).total_seconds()
-                        lat += data.get("lat_offset_rate", 0.0) * dt
-                        lon += data.get("lon_offset_rate", 0.0) * dt
-                        alt += data.get("alt_offset_rate", 0.0) * dt
+                    if data.get("maneuver_offset") and data.get("offset_applied_at"):
+                        elapsed = (datetime.utcnow() - data["offset_applied_at"]).total_seconds()
+                        if elapsed < 60:
+                            lon += data.get("lon_offset_rate", 0.0) * elapsed
                     
                     # Update cache so REST API sees it too
                     data["position"] = pos
@@ -70,9 +86,32 @@ async def broadcast_satellite_positions():
             if positions:
                 msg = WSMessage.now(
                     type_=WSMessageType.satellite_update,
-                    payload={"satellites": positions}
+                    payload={
+                        "satellites": positions,
+                        "sim_time": get_sim_time().isoformat(),
+                        "sim_speed": SIM_SPEED,
+                    }
                 )
-                await manager.broadcast(msg.model_dump())
+                try:
+                    await manager.broadcast(msg.model_dump())
+                except Exception:
+                    pass
+            
+            # Broadcast metrics every 5 seconds
+            current_time = time_module.time()
+            if current_time - last_metrics_time >= 5:
+                last_metrics_time = current_time
+                from backend.api.routes import get_metrics
+                metrics = await get_metrics()
+                metrics_msg = WSMessage.now(
+                    type_=WSMessageType.metrics_update,
+                    payload=metrics
+                )
+                try:
+                    await manager.broadcast(metrics_msg.model_dump())
+                except Exception:
+                    pass
+                
         except Exception as e:
             logger.error(f"Error in satellite propagation task: {e}")
 
@@ -83,13 +122,20 @@ async def drain_agent_ws_events():
     while True:
         try:
             message = broadcast_queue.get_nowait()
-            await manager.broadcast(message)
+            try:
+                await manager.broadcast(message)
+            except Exception:
+                pass
         except asyncio.QueueEmpty:
             pass
         await asyncio.sleep(0.1)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global SIM_START_REAL, SIM_START_UTC
+    SIM_START_REAL = time_module.time()
+    SIM_START_UTC = datetime.utcnow()
+
     # 1. init_db()
     logger.info("Initializing DB...")
     await init_db()

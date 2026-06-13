@@ -4,12 +4,18 @@ import { WSMessage } from '../types';
 
 export const useWebSocket = () => {
   const wsRef = useRef<WebSocket | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { 
     updateSatellites, 
     addFeedEvent, 
     setHitlRequest,
     updateMetrics,
-    setActiveConjunctions
+    setActiveConjunctions,
+    setSimSpeed,
+    setSimTime,
+    setActiveMathTrace,
+    clearTrail,
+    setResolvedEvent,
   } = useSpaceStore();
 
   useEffect(() => {
@@ -26,7 +32,7 @@ export const useWebSocket = () => {
       
       ws.onclose = () => {
         console.log(`WebSocket disconnected, reconnecting in ${backoff}ms...`);
-        setTimeout(connectWs, backoff);
+        timeoutRef.current = setTimeout(connectWs, backoff);
         backoff = Math.min(backoff * 1.5, 5000); // Max 5s backoff
       };
       
@@ -40,6 +46,8 @@ export const useWebSocket = () => {
           switch (msg.type) {
             case 'satellite_update':
               updateSatellites(msg.payload.satellites);
+              if (msg.payload.sim_time) setSimTime(msg.payload.sim_time);
+              if (msg.payload.sim_speed !== undefined) setSimSpeed(msg.payload.sim_speed);
               break;
               
             case 'conjunction_detected':
@@ -55,7 +63,7 @@ export const useWebSocket = () => {
                     conjunctions_detected: data.conjunctions_detected,
                     resolved: data.resolved,
                     maneuvers_executed: data.maneuvers_executed,
-                    total_delta_v: data.total_delta_v,
+                    total_delta_v_ms: data.total_delta_v_ms,
                     system_status: data.system_status
                   }
                 }));
@@ -72,6 +80,19 @@ export const useWebSocket = () => {
               
             case 'maneuver_executed':
               addFeedEvent(msg);
+              setActiveMathTrace(null);
+              clearTrail(msg.payload.satellite_name);
+              
+              // We need both satellites for the resolution visual
+              const currentConj = useSpaceStore.getState().activeConjunctions.find(c => c.event_id === msg.payload.event_id);
+              if (currentConj) {
+                setResolvedEvent({
+                  satA: currentConj.sat_primary,
+                  satB: currentConj.sat_secondary,
+                  timestamp: Date.now()
+                });
+              }
+
               fetch('/api/conjunctions')
                 .then(res => res.json())
                 .then(data => setActiveConjunctions(data));
@@ -83,7 +104,7 @@ export const useWebSocket = () => {
                     conjunctions_detected: data.conjunctions_detected,
                     resolved: data.resolved,
                     maneuvers_executed: data.maneuvers_executed,
-                    total_delta_v: data.total_delta_v,
+                    total_delta_v_ms: data.total_delta_v_ms,
                     system_status: data.system_status
                   }
                 }));
@@ -99,7 +120,7 @@ export const useWebSocket = () => {
                     conjunctions_detected: data.conjunctions_detected,
                     resolved: data.resolved,
                     maneuvers_executed: data.maneuvers_executed,
-                    total_delta_v: data.total_delta_v,
+                    total_delta_v_ms: data.total_delta_v_ms,
                     system_status: data.system_status
                   }
                 }));
@@ -117,6 +138,9 @@ export const useWebSocket = () => {
       if (wsRef.current) {
         wsRef.current.onclose = null; // Prevent reconnect on unmount
         wsRef.current.close();
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, []);

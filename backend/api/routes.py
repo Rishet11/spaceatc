@@ -4,8 +4,10 @@ backend/api/routes.py — REST API routes (PRD Section 7).
 
 import uuid
 import json
+import time as time_module
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from backend.db.store import (
     get_all_satellites,
@@ -23,6 +25,47 @@ router = APIRouter()
 # In-memory cache of Satrec objects populated by main.py background task
 # so GET /api/satellites can return propagated positions.
 sat_cache = {}
+latest_session_id = "demo_session"
+
+
+class SimSpeedBody(BaseModel):
+    speed: float
+
+
+@router.get("/api/sim/speed")
+async def get_sim_speed():
+    """Return current simulation speed and time."""
+    import backend.main as _main
+    return {
+        "speed": _main.SIM_SPEED,
+        "sim_time": _main.get_sim_time().isoformat(),
+    }
+
+
+@router.post("/api/sim/speed")
+async def set_sim_speed(body: SimSpeedBody):
+    """Set simulation speed. Valid values: 1, 10, 60, 300, 600.
+    
+    Resets the sim clock reference point to prevent time jumps on speed change.
+    """
+    import backend.main as _main
+    valid = {1.0, 10.0, 60.0, 300.0, 600.0}
+    speed = float(body.speed)
+    if speed not in valid:
+        raise HTTPException(status_code=400, detail=f"Speed must be one of {valid}")
+
+    # Capture current sim time before changing speed to prevent jump
+    current_sim_time = _main.get_sim_time()
+
+    # Reset reference point
+    _main.SIM_START_REAL = time_module.time()
+    _main.SIM_START_UTC = current_sim_time
+    _main.SIM_SPEED = speed
+
+    return {
+        "speed": _main.SIM_SPEED,
+        "sim_time": _main.get_sim_time().isoformat(),
+    }
 
 @router.get("/health")
 async def health_check():
@@ -69,29 +112,53 @@ async def get_single_conjunction(event_id: str):
 
 @router.get("/api/metrics")
 async def get_metrics():
-    from backend.db.store import get_proposals_for_event
-    sats = await get_all_satellites()
-    events = await get_all_conjunctions()
-
-    resolved = [e for e in events if e["status"] == "resolved"]
-
-    # Sum delta-V from proposals for resolved events
-    total_dv = 0.0
-    for ev in resolved:
-        proposals = await get_proposals_for_event(ev["event_id"])
-        if proposals:
-            # Pick the winning (lowest bid_score) proposal
-            best = min(proposals, key=lambda p: p["bid_score"])
-            total_dv += best["delta_v_ms"]
-
-    return MetricsResponse(
-        active_satellites=len(sats),
-        conjunctions_detected=len(events),
-        resolved=len(resolved),
-        maneuvers_executed=len(resolved),
-        total_delta_v=total_dv,
-        system_status="ACTIVE"
-    ).model_dump()
+    import aiosqlite
+    from backend.config import settings
+    async with aiosqlite.connect(settings.sqlite_path) as db:
+        # Active satellites: count from DB
+        async with db.execute("SELECT COUNT(*) FROM satellites") as c:
+            active_sats = (await c.fetchone())[0]
+        
+        # Total conjunctions detected ever
+        async with db.execute("SELECT COUNT(*) FROM conjunctions") as c:
+            total_conjunctions = (await c.fetchone())[0]
+        
+        # Resolved conjunctions
+        async with db.execute(
+            "SELECT COUNT(*) FROM conjunctions WHERE status='resolved'"
+        ) as c:
+            resolved = (await c.fetchone())[0]
+        
+        # Maneuvers executed (proposals that were winning + approved)
+        async with db.execute(
+            "SELECT COUNT(*) FROM proposals WHERE bid_score = ("
+            "SELECT MIN(bid_score) FROM proposals p2 "
+            "WHERE p2.event_id = proposals.event_id"
+            ")"
+        ) as c:
+            maneuvers = (await c.fetchone())[0]
+        
+        # Total delta-V: SUM of all winning proposal delta_v_ms values
+        async with db.execute("""
+            SELECT COALESCE(SUM(p.delta_v_ms), 0) 
+            FROM proposals p
+            INNER JOIN conjunctions c ON p.event_id = c.event_id
+            WHERE c.status = 'resolved'
+            AND p.bid_score = (
+                SELECT MIN(bid_score) FROM proposals p2 
+                WHERE p2.event_id = p.event_id
+            )
+        """) as c:
+            total_dv_ms = (await c.fetchone())[0]
+        
+        return {
+            "active_satellites": active_sats,
+            "conjunctions_detected": total_conjunctions,
+            "resolved": resolved,
+            "maneuvers_executed": maneuvers,
+            "total_delta_v_ms": round(total_dv_ms, 3),
+            "system_status": "ACTIVE"
+        }
 
 @router.post("/api/demo/reset")
 async def demo_reset():
@@ -181,8 +248,9 @@ async def demo_inject():
     sat_cache["99002"] = {"satrec": satrec_b}
     
     # 3. Run full pipeline
-    session_id = "demo_session"
-    state = await run_pipeline(session_id)
+    global latest_session_id
+    latest_session_id = str(uuid.uuid4())
+    state = await run_pipeline(latest_session_id)
     
     # Find the injected event (the one with DEMO-SAT-A)
     event_id = None
@@ -205,13 +273,14 @@ async def hitl_approve(event_id: str):
     # Let's search DB for latest proposal or just use the event_id as session_id when starting it?
     # If run_pipeline uses session_id = event_id, it would be easy. But event_id is generated inside!
     # I'll just use a fixed thread_id for MVP demo.
-    await resume_after_hitl("demo_session", "approve")
-    
     # The WS event maneuver_executed is sent by execute_maneuver node.
+    global latest_session_id
+    await resume_after_hitl(latest_session_id, "approve")
     return {"status": "approved"}
 
 @router.post("/api/hitl/{event_id}/veto")
 async def hitl_veto(event_id: str):
     await update_conjunction_status(event_id, "vetoed")
-    await resume_after_hitl("demo_session", "veto")
+    global latest_session_id
+    await resume_after_hitl(latest_session_id, "veto")
     return {"status": "vetoed"}

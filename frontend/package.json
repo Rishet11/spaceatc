@@ -15,6 +15,7 @@
     "puppeteer": "^25.1.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "react-router-dom": "^7.17.0",
     "satellite.js": "^7.0.1",
     "three": "^0.184.0",
     "zustand": "^5.0.14"

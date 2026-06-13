@@ -106,14 +106,21 @@ async def detect_conjunctions(state: AgentState) -> dict:
                 
                 ws_events.append(WSMessage.now(
                     type_=WSMessageType.conjunction_detected,
-                    payload=ws_payload
+                    payload={
+                        **ws_payload,
+                        "messages": [
+                            f"[DETECTOR] Conjunction: {sat1['name']} / {sat2['name']}",
+                            f"[DETECTOR] Miss distance: {c_out.miss_distance_km:.3f} km | Pc: 1 in {int(1/c_out.pc)} | TCA: {c_out.tca.strftime('%H:%M:%S')} UTC",
+                            "[DETECTOR] Status: ALERT \u2014 Pc exceeds 1\u00d710\u207b\u2074 threshold",
+                        ]
+                    }
                 ).model_dump())
                 
         if pairs_checked >= 20:
             break
             
-    msg = f"[Detector] Screened {pairs_checked} pairs. Found {len(active_conjunctions) - len(state.get('active_conjunctions', []))} active conjunctions."
-    
+    new_conj = len(active_conjunctions) - len(state.get('active_conjunctions', []))
+    msg = f"[DETECTOR] Screened {pairs_checked} pairs. Found {new_conj} conjunction(s) requiring attention."
     next_phase = "negotiating" if active_conjunctions else "resolved"
 
     return {

@@ -80,17 +80,23 @@ async def ingest_tle(state: AgentState) -> dict:
                 "maneuver_count": 0
             })
 
-    msg = f"[TLE Ingestion] Loaded {len(processed_sats)} satellites."
-    
-    # 4. Queue system_status WS event
+    msg = f"[TLE INGESTION] Loaded {len(processed_sats)} active satellites from CelesTrak"
+    msg2 = "[TLE INGESTION] Coverage: SpaceX Starlink, OneWeb, active payloads"
+    new_messages = [msg, msg2]
+
+    # 4. Queue system_status WS event (include messages so frontend can log them)
     ws_event = WSMessage.now(
         type_=WSMessageType.system_status,
-        payload={"status": "ACTIVE", "satellites_loaded": len(processed_sats)}
+        payload={
+            "status": "ACTIVE",
+            "satellites_loaded": len(processed_sats),
+            "messages": new_messages,
+        }
     ).model_dump()
 
     return {
         "phase": "screening",
         "satellites": processed_sats,
-        "messages": state.get("messages", []) + [msg],
+        "messages": state.get("messages", []) + new_messages,
         "websocket_events": state.get("websocket_events", []) + [ws_event]
     }

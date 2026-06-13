@@ -72,13 +72,24 @@ async def generate_operator_bid(state: AgentState) -> dict:
             "post_maneuver_miss_km": m_out.post_maneuver_miss_km,
             "fuel_cost_units": dv * 0.01,  # ~1% of delta-V in fuel units (realistic ratio)
             "bid_score": bid_score,
+            "computation_trace": m_out.trace,
             "maneuvering_sat_obj": maneuvering_sat # Store for executor
         }
         
-        await insert_proposal({k: v for k, v in proposal.items() if k != "maneuvering_sat_obj"})
+        await insert_proposal({k: v for k, v in proposal.items() if k not in ["maneuvering_sat_obj", "computation_trace"]})
         proposals.append(proposal)
         
     # Queue bids_received WS event
+    bid_messages = []
+    for p in proposals:
+        fuel_remaining = max(0.0, p.get("fuel_cost_units", 0) * 100)  # rough % remaining
+        # fuel_units start at 100, cost is delta_v * 0.01
+        fuel_pct = 100.0 - (p["fuel_cost_units"] / 1.0) * 100  # each fuel_unit = 1%
+        fuel_pct = max(0.0, min(100.0, 100.0 - p["delta_v_ms"] * 0.01 * 100))
+        bid_messages.append(
+            f"[OPERATOR {p['operator']}] Bid: \u0394V={p['delta_v_ms']:.3f} m/s | Score={p['bid_score']:.3f} | Fuel remaining: {100.0 - p['fuel_cost_units']:.0f}%"
+        )
+
     ws_event_bids_received = WSMessage.now(
         type_=WSMessageType.negotiation_update,
         payload={
@@ -87,20 +98,21 @@ async def generate_operator_bid(state: AgentState) -> dict:
             "proposals": [
                 {"operator": p["operator"], "delta_v_ms": p["delta_v_ms"], "bid_score": p["bid_score"]}
                 for p in proposals
-            ]
+            ],
+            "messages": bid_messages,
         }
     ).model_dump()
-        
+
     # 4. Pick winner (lower score)
     winning_proposal = min(proposals, key=lambda x: x["bid_score"])
     loser_proposal = max(proposals, key=lambda x: x["bid_score"])
-    
+
     winner = winning_proposal["operator"]
     loser = loser_proposal["operator"]
     winner_dv = winning_proposal["delta_v_ms"]
     loser_dv = loser_proposal["delta_v_ms"]
-    
-    rationale = f"{winner} selected: ΔV {winner_dv:.3f} m/s. Mission impact: LOW."
+
+    rationale = f"{winner} selected: \u0394V {winner_dv:.3f} m/s. Mission impact: LOW."
     try:
         import google.generativeai as genai
         from backend.config import settings
@@ -113,9 +125,10 @@ async def generate_operator_bid(state: AgentState) -> dict:
                 rationale = response.text.strip()
     except Exception as e:
         logger.error(f"Gemini API call failed: {e}")
-        
-    msg = f"[Operator] {rationale}"
-    
+
+    winner_msg = f"[COORDINATOR] Winner: {winner} \u2014 lowest cost maneuver selected"
+    all_messages = bid_messages + [winner_msg]
+
     # Queue negotiation_update (stage: "winner_selected")
     ws_event = WSMessage.now(
         type_=WSMessageType.negotiation_update,
@@ -123,23 +136,29 @@ async def generate_operator_bid(state: AgentState) -> dict:
             "event_id": current_event_id,
             "stage": "winner_selected",
             "winner": winning_proposal["operator"],
-            "winning_bid_score": winning_proposal["bid_score"]
+            "winning_bid_score": winning_proposal["bid_score"],
+            "messages": [winner_msg],
         }
     ).model_dump()
-    
+
     # Queue hitl_request
+    hitl_messages = [
+        "[HITL] Proposal sent to human operator for approval",
+        "[HITL] Awaiting decision \u2014 30 second timeout",
+    ]
     ws_event_hitl = WSMessage.now(
         type_=WSMessageType.hitl_request,
         payload={
             "event_id": current_event_id,
-            "proposal": {k: v for k, v in winning_proposal.items() if k != "maneuvering_sat_obj"}
+            "proposal": {k: v for k, v in winning_proposal.items() if k != "maneuvering_sat_obj"},
+            "messages": hitl_messages,
         }
     ).model_dump()
-    
+
     return {
         "phase": "pending_hitl",
         "proposals": state.get("proposals", []) + proposals,
         "winning_proposal": winning_proposal,
-        "messages": state.get("messages", []) + [msg],
+        "messages": state.get("messages", []) + all_messages + hitl_messages,
         "websocket_events": state.get("websocket_events", []) + [ws_event_bids_received, ws_event, ws_event_hitl]
     }

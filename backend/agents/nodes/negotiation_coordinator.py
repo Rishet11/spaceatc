@@ -26,21 +26,28 @@ async def coordinate_negotiation(state: AgentState) -> dict:
     
     # 2. Set current_event_id
     current_event_id = highest_pc_event["event_id"]
-    
-    msg = f"[Negotiation] Started bidding for event {current_event_id[:8]}... (Pc={highest_pc_event['pc']:.2e})"
-    
+
+    op_a = highest_pc_event.get("sat_primary_obj", {}).get("operator", highest_pc_event.get("sat_primary", "Operator A"))
+    op_b = highest_pc_event.get("sat_secondary_obj", {}).get("operator", highest_pc_event.get("sat_secondary", "Operator B"))
+
+    new_messages = [
+        "[COORDINATOR] Broadcasting Call for Proposals to operators",
+        f"[COORDINATOR] Operators involved: {op_a}, {op_b}",
+    ]
+
     # 3. Queue negotiation_update
     ws_event = WSMessage.now(
         type_=WSMessageType.negotiation_update,
         payload={
             "event_id": current_event_id,
             "stage": "bids_requested",
-            "message": "Operators are formulating maneuver proposals"
+            "message": "Operators are formulating maneuver proposals",
+            "messages": new_messages,
         }
     ).model_dump()
-    
+
     return {
         "current_event_id": current_event_id,
-        "messages": state.get("messages", []) + [msg],
+        "messages": state.get("messages", []) + new_messages,
         "websocket_events": state.get("websocket_events", []) + [ws_event]
     }

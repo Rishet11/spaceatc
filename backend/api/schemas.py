@@ -175,7 +175,7 @@ class MetricsResponse(BaseModel):
     conjunctions_detected: int = Field(description="Total conjunction events detected")
     resolved: int = Field(description="Conjunctions resolved by approved maneuver")
     maneuvers_executed: int = Field(description="Total burns executed")
-    total_delta_v: float = Field(description="Sum of all delta-V executed (m/s)")
+    total_delta_v_ms: float = Field(description="Sum of all delta-V executed (m/s)")
     system_status: str = Field(
         description="'ACTIVE' | 'IDLE' | 'ERROR'",
         default="ACTIVE",

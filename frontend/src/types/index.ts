@@ -50,7 +50,7 @@ export interface Metrics {
   conjunctions_detected: number;
   resolved: number;
   maneuvers_executed: number;
-  total_delta_v: number;
+  total_delta_v_ms: number;
   system_status: 'ACTIVE' | 'IDLE' | 'ERROR';
 }
 
