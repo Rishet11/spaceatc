@@ -35,6 +35,7 @@ export const useWebSocket = () => {
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data) as WSMessage;
+          if (msg.type !== 'satellite_update') console.log(`[WS MESSAGE] ${msg.type}`, msg.payload);
           
           switch (msg.type) {
             case 'satellite_update':
