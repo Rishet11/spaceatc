@@ -27,7 +27,7 @@ from scipy.optimize import minimize_scalar
 from sgp4.api import jday
 
 # ---------------------------------------------------------------------------
-# Screening thresholds (PRD §8.3)
+# Screening thresholds 
 # ---------------------------------------------------------------------------
 
 SCREENING_DISTANCE_KM: float = 5.0    # Flag pairs closer than this
@@ -35,7 +35,7 @@ PC_ALERT_THRESHOLD: float = 1e-4      # Trigger maneuver negotiation
 PC_SAFE_THRESHOLD: float = 1e-6       # Target Pc after maneuver
 
 # ---------------------------------------------------------------------------
-# Interface dataclasses — LOCKED (PRD §11 — do not change)
+# Interface dataclasses 
 # ---------------------------------------------------------------------------
 
 
@@ -101,7 +101,7 @@ def _propagate(satrec, dt: datetime):
 
 
 # ---------------------------------------------------------------------------
-# Pc helper — exact formula from PRD §8.3
+# Pc helper 
 # ---------------------------------------------------------------------------
 
 
@@ -124,8 +124,6 @@ def compute_pc_simplified(
 
         Pc = (π · r_combined² / σ²) · exp(−d² / 2σ²)
 
-    This is the formula specified verbatim in PRD §8.3.
-
     Args:
         miss_distance_km:       Scalar miss distance at TCA (km).
         relative_velocity_km_s: Relative speed at TCA (km/s).  Not used in
@@ -138,7 +136,7 @@ def compute_pc_simplified(
         Collision probability as a float clamped to [0, 1].
     """
     sigma = 1.0  # km — TLE position uncertainty (conservative)
-    # 2-D Gaussian encounter probability (PRD §8.3 formula verbatim)
+    # 2-D Gaussian encounter probability 
     pc = (
         math.exp(-0.5 * (miss_distance_km / sigma) ** 2)
         * (combined_radius_km / sigma) ** 2
@@ -155,7 +153,7 @@ def compute_pc_simplified(
 def find_tca(input: ConjunctionInput) -> ConjunctionOutput:  # noqa: A002
     """Find Time of Closest Approach between two satellites.
 
-    Algorithm (PRD §8.3 / Section 11):
+    Algorithm :
         1. **Coarse scan** — evaluate separation every 60 s across the
            [t_start, t_end] window and locate the time-step with minimum
            distance.
