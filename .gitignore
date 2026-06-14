@@ -72,3 +72,21 @@ frontend/.cache/
 .DS_Store
 Thumbs.db
 spaceatc.db*
+
+# ===========================
+# OrbitMind / Datasets
+# ===========================
+OrbitMind/*.mat
+OrbitMind/*.pt
+OrbitMind/*.pth
+OrbitMind/*.csv
+OrbitMind/output_h264.mp4
+OrbitMind/output_inference.mp4
+OrbitMind/uploads/
+
+# Local session files / logs
+*.db-shm
+*.db-wal
+backend_output.log
+.claude/
+.graphify/
