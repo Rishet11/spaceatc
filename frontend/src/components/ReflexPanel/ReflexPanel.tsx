@@ -45,6 +45,7 @@ export const ReflexPanel: React.FC = () => {
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
+  const terminalRef = useRef<HTMLDivElement | null>(null);
 
   // 1. Fetch total frame count on mount
   useEffect(() => {
@@ -79,9 +80,11 @@ export const ReflexPanel: React.FC = () => {
         });
       }
       
-      // Auto scroll terminal to bottom
+      // Auto scroll terminal container only (avoiding page-level scroll)
       setTimeout(() => {
-        logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (terminalRef.current) {
+          terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+        }
       }, 50);
 
     } catch (err: any) {
@@ -219,6 +222,19 @@ export const ReflexPanel: React.FC = () => {
   const distance = frameData?.pose.distance ?? 5.0;
   const isEvading = frameData?.status === "CRITICAL";
   const isWarning = frameData?.status === "WARNING";
+
+  const t = totalFrames > 1 ? currentFrame / (totalFrames - 1) : 0;
+  const satX = 50 + t * 900;
+  let satY = 88;
+  if (isEvading) {
+    if (satX >= 250 && satX <= 750) {
+      const dx = (satX - 250) / 500;
+      satY = 88 + Math.sin(dx * Math.PI) * 50;
+    }
+  }
+
+  const debrisX = 350 + t * 200;
+  const debrisY = t * 176;
 
   return (
     <div className="w-full h-full grid grid-cols-12 gap-6 p-6 overflow-y-auto bg-[#070a13] font-sans text-gray-200">
@@ -545,7 +561,10 @@ export const ReflexPanel: React.FC = () => {
           </div>
 
           {/* Terminal Console */}
-          <div className="flex-1 bg-black/60 rounded-xl border border-white/5 p-4 font-mono text-xs overflow-y-auto max-h-[300px] flex flex-col space-y-2 relative shadow-inner">
+          <div 
+            ref={terminalRef}
+            className="flex-1 bg-black/60 rounded-xl border border-white/5 p-4 font-mono text-xs overflow-y-auto max-h-[300px] flex flex-col space-y-2 relative shadow-inner"
+          >
             <div className="absolute top-2 right-2 text-[9px] text-emerald-500/50 uppercase tracking-widest">
               Llama-3B-Int4 // Gram-Constrained
             </div>
@@ -614,10 +633,12 @@ export const ReflexPanel: React.FC = () => {
           <div className="absolute left-0 right-0 h-8 border-y border-emerald-500/10 bg-emerald-500/5 top-1/2 -translate-y-1/2" />
 
           {/* Satellite Trajectory Line */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 176" preserveAspectRatio="none">
             {/* Evasion deviation curve */}
             <path
-              d={`M 0 88 L 200 88 Q 350 ${isEvading ? "140" : "88"} 500 ${isEvading ? "140" : "88"} T 900 88`}
+              d={isEvading 
+                ? "M 0 88 L 250 88 C 350 88, 400 138, 500 138 C 600 138, 650 88, 750 88 L 1000 88" 
+                : "M 0 88 L 1000 88"}
               fill="none"
               stroke="#10b981"
               strokeWidth="2"
@@ -643,8 +664,9 @@ export const ReflexPanel: React.FC = () => {
                 : "bg-gray-800/40 border-gray-600"
             }`}
             style={{
-              left: `${Math.min(95, 20 + (currentFrame / totalFrames) * 60)}%`,
-              top: `calc(50% - 16px + ${isEvading ? "50px" : "0px"})`
+              left: `${(satX / 1000) * 100}%`,
+              top: `${(satY / 176) * 100}%`,
+              transform: 'translate(-50%, -50%)'
             }}
           >
             <Cpu className={`w-4 h-4 ${isEvading ? "text-emerald-400" : "text-gray-400"}`} />
@@ -664,8 +686,9 @@ export const ReflexPanel: React.FC = () => {
           <div
             className="absolute w-6 h-6 rounded-lg bg-red-950/40 border border-red-500 flex items-center justify-center shadow-lg shadow-red-500/10 transition-all duration-100"
             style={{
-              left: `calc(35% - 12px + ${(currentFrame / totalFrames) * 150}px)`,
-              top: `calc(0% - 12px + ${(currentFrame / totalFrames) * 132}px)`
+              left: `${(debrisX / 1000) * 100}%`,
+              top: `${(debrisY / 176) * 100}%`,
+              transform: 'translate(-50%, -50%)'
             }}
           >
             <div className="w-2 h-2 bg-red-500 rounded-sm animate-spin-slow" />
