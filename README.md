@@ -98,15 +98,6 @@ SpaceATC fills the uncoordinated handoff gap. It is a multi-agent autonomous neg
 
 ---
 
-## 🎥 Demo
-
-> [!NOTE]  
-> Watch the full SpaceATC Demo Video here: `[Link to Demo Video]`
-
-![Screenshot of the globe with conjunction event active](docs/screenshot.png) *(Add your screenshot path here)*
-
----
-
 ## ⚙️ Setup
 
 ### Backend
