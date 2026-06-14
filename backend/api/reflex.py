@@ -4,6 +4,7 @@ backend/api/reflex.py — REST API router for OrbitMind Reflex Layer
 
 import os
 import sys
+import shutil
 import base64
 import json
 import logging
@@ -347,12 +348,14 @@ async def upload_video(file: UploadFile = File(...)):
     target_path = os.path.join(UPLOAD_DIR, f"uploaded_video{ext}")
     
     try:
+        await file.seek(0)
         with open(target_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
+            shutil.copyfileobj(file.file, f)
     except Exception as e:
         logger.error(f"Failed to save uploaded video: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save video: {e}")
+    finally:
+        await file.close()
         
     cap = cv2.VideoCapture(target_path)
     if not cap.isOpened():
