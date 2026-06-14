@@ -80,13 +80,16 @@ export const EventFeed: React.FC = () => {
   const logEntries: LogEntry[] = React.useMemo(() => {
     const entries: LogEntry[] = [];
 
-    [...eventFeed].reverse().forEach((ev, evIdx) => {
+    [...eventFeed].reverse().forEach((ev) => {
       const messages: string[] = ev.payload?.messages ?? [];
+      // Use timestamp + type as the stable base — these won't shift when new
+      // events are prepended to the feed the way array indices do.
+      const base = `${ev.timestamp}::${ev.type}`;
 
       if (messages.length > 0) {
         messages.forEach((msg, mIdx) => {
           entries.push({
-            id: `${evIdx}-${mIdx}`,
+            id: `${base}::${mIdx}`,
             timestamp: ev.timestamp,
             message: msg,
           });
@@ -95,7 +98,7 @@ export const EventFeed: React.FC = () => {
         // Fallback: synthesise a message from the event type
         const fallback = ev.payload?.message ?? ev.type.replace(/_/g, ' ').toUpperCase();
         entries.push({
-          id: `${evIdx}-0`,
+          id: `${base}::0`,
           timestamp: ev.timestamp,
           message: `[SYSTEM] ${fallback}`,
         });
@@ -112,7 +115,7 @@ export const EventFeed: React.FC = () => {
   }, [logEntries.length]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar" style={{ fontFamily: 'monospace' }}>
+    <div className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar font-mono">
       {/* Header */}
       <div className="flex items-center justify-between px-1 mb-2">
         <span className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">

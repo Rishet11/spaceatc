@@ -30,8 +30,8 @@ export const MathPanel: React.FC = () => {
   const isComplete = visibleItems >= activeMathTrace.length;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-300">
-      <div className="bg-black border border-green-500/50 rounded shadow-[0_0_30px_rgba(34,197,94,0.15)] text-green-500 font-mono p-6 min-w-[500px] max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[28vh] bg-black/60 backdrop-blur-sm transition-opacity duration-300">
+      <div className="bg-black border border-green-500/50 rounded shadow-[0_0_30px_rgba(34,197,94,0.15)] text-green-500 font-mono p-6 w-[92%] md:w-auto md:min-w-[500px] max-w-2xl max-h-[66vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center space-x-3 text-green-400 mb-2 border-b border-green-500/30 pb-3">
           <Settings className={`w-5 h-5 ${!isComplete ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />

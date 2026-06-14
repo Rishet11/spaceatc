@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Tailwind v4 theme tokens — makes `font-mono` use JetBrains Mono everywhere it's
+   already applied (mission-control surfaces). v4 reads tokens from @theme, not
+   tailwind.config.js. */
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
 @layer base {
   body {
     background-color: black;
@@ -8,4 +15,85 @@
     -moz-osx-font-smoothing: grayscale;
     overflow: hidden;
   }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+/* Decision-outcome feedback: full-screen colour flash, banner pop-in, and the
+   collision screen shake. */
+@keyframes outcome-flash {
+  0% { opacity: 0; }
+  12% { opacity: 0.45; }
+  100% { opacity: 0; }
+}
+
+.animate-outcome-flash {
+  animation: outcome-flash 0.9s ease-out forwards;
+}
+
+@keyframes outcome-pop {
+  0% { opacity: 0; transform: translateY(-16px) scale(0.92); }
+  12% { opacity: 1; transform: translateY(0) scale(1.04); }
+  20% { transform: translateY(0) scale(1); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.98); }
+}
+
+.animate-outcome-pop {
+  animation: outcome-pop 4.2s ease-out forwards;
+}
+
+@keyframes screen-shake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-6px, 4px); }
+  20% { transform: translate(7px, -5px); }
+  30% { transform: translate(-8px, -3px); }
+  40% { transform: translate(6px, 6px); }
+  50% { transform: translate(-5px, 4px); }
+  60% { transform: translate(6px, -4px); }
+  70% { transform: translate(-4px, 3px); }
+  80% { transform: translate(3px, -2px); }
+  90% { transform: translate(-2px, 1px); }
+}
+
+.animate-screen-shake {
+  animation: screen-shake 0.7s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Thin mission-control scrollbar — referenced by EventFeed + MathPanel */
+.custom-scrollbar::-webkit-scrollbar        { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track  { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.12); border-radius: 2px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+.custom-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.12) transparent; }
+
+@keyframes scanline {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+
+.animate-scanline {
+  animation: scanline 4s linear infinite;
+}
+
+@keyframes spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
 }

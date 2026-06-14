@@ -4,7 +4,9 @@ import {
   ConjunctionEvent,
   WSMessageHitlRequest,
   Metrics,
-  EventLogItem
+  EventLogItem,
+  DecisionOutcome,
+  ManeuverBid
 } from '../types';
 
 export interface SpaceState {
@@ -13,6 +15,8 @@ export interface SpaceState {
   currentHitlRequest: WSMessageHitlRequest | null;
   activeMathTrace: any[] | null;
   resolvedEvent: { satA: string; satB: string; timestamp: number } | null;
+  decisionOutcome: DecisionOutcome | null;
+  negotiationBids: ManeuverBid[] | null;
   metrics: Metrics;
   eventFeed: EventLogItem[];
 
@@ -39,6 +43,14 @@ export interface SpaceState {
   clearTrail: (name: string) => void;
   trailClearedCount: number; // simple toggle to force reactivity
   setResolvedEvent: (event: { satA: string; satB: string; timestamp: number } | null) => void;
+  setDecisionOutcome: (outcome: DecisionOutcome | null) => void;
+  setNegotiationBids: (bids: ManeuverBid[] | null) => void;
+  /** Clear lingering resolved/green visuals and stale bid data once an event is over. */
+  clearConjunctionVisuals: () => void;
+  /** Full reset before a new conjunction so destroyed sats reappear and stale visuals drop. */
+  resetForNewConjunction: () => void;
+  activeTab: 'ground' | 'reflex';
+  setActiveTab: (tab: 'ground' | 'reflex') => void;
 }
 
 export const useSpaceStore = create<SpaceState>((set) => ({
@@ -47,6 +59,8 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   currentHitlRequest: null,
   activeMathTrace: null,
   resolvedEvent: null,
+  decisionOutcome: null,
+  negotiationBids: null,
   eventFeed: [],
   destroyedSatellites: [],
   trailClearedCount: 0,
@@ -107,4 +121,15 @@ export const useSpaceStore = create<SpaceState>((set) => ({
     return { trailClearedCount: state.trailClearedCount + 1 };
   }),
   setResolvedEvent: (event) => set({ resolvedEvent: event }),
+  setDecisionOutcome: (outcome) => set({ decisionOutcome: outcome }),
+  setNegotiationBids: (bids) => set({ negotiationBids: bids }),
+  clearConjunctionVisuals: () => set({ resolvedEvent: null, negotiationBids: null }),
+  resetForNewConjunction: () => set({
+    destroyedSatellites: [],
+    resolvedEvent: null,
+    decisionOutcome: null,
+    negotiationBids: null,
+  }),
+  activeTab: 'ground',
+  setActiveTab: (tab) => set({ activeTab: tab }),
 }));

@@ -4,6 +4,7 @@ import { OrbitControls, Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { SatelliteLayer, geodeticToThreeJS } from './SatelliteLayer';
 import { ConjunctionMarker } from './ConjunctionMarker';
+import { ConjunctionPaths } from './ConjunctionPaths';
 import { CollisionExplosion } from './CollisionExplosion';
 import { useSpaceStore } from '../../store/useSpaceStore';
 
@@ -49,6 +50,7 @@ function Starfield() {
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
+          args={[positions, 3]}
           count={1000}
           array={positions}
           itemSize={3}
@@ -165,8 +167,8 @@ function ConjunctionZone() {
         opacity={0.8}
       />
 
-      {activePair && (
-        <Html position={midpoint} center>
+      {activePair && !isResolving && (
+        <Html position={midpoint} center zIndexRange={[10, 0]}>
           <div
             style={{
               background: 'rgba(239,68,68,0.9)',
@@ -174,30 +176,30 @@ function ConjunctionZone() {
               padding: '4px 8px',
               borderRadius: '4px',
               fontSize: '12px',
-              fontFamily: 'monospace',
+              fontFamily: 'var(--font-mono)',
               whiteSpace: 'nowrap',
               pointerEvents: 'none',
               boxShadow: '0 0 12px rgba(239,68,68,0.5)',
             }}
           >
-            ⚠ {(dist * 6371).toFixed(1)} km — COLLISION COURSE
+            {(dist * 6371).toFixed(1)} km · COLLISION COURSE
           </div>
         </Html>
       )}
 
       {isResolving && (
-        <Html position={midpoint} center>
+        <Html position={midpoint} center zIndexRange={[10, 0]}>
           <div style={{
              fontSize: '2rem',
              color: '#22c55e',
              fontWeight: 'bold',
-             fontFamily: 'monospace',
+             fontFamily: 'var(--font-mono)',
              whiteSpace: 'nowrap',
              textShadow: '0 0 20px #22c55e',
              animation: 'fadeOut 3s forwards',
              pointerEvents: 'none'
           }}>
-            ✓ CONJUNCTION RESOLVED
+            CONJUNCTION RESOLVED
           </div>
           <style>{`
             @keyframes fadeOut {
@@ -229,15 +231,11 @@ function CameraController() {
   );
 
   useFrame(() => {
-    if (activePair) {
-      // Zoom closer
-      const target = new THREE.Vector3(0, 0, 3.0);
-      camera.position.lerp(target, 0.02);
-    } else {
-      // Smoothly return to original distance [0,0,4]
-      const target = new THREE.Vector3(0, 0, 4.0);
-      camera.position.lerp(target, 0.015);
-    }
+    // Only animate the camera's distance from the center, preserving the user's manual rotation angles.
+    const currentDist = camera.position.length();
+    const targetDist = activePair ? 2.8 : 4.0;
+    const newDist = THREE.MathUtils.lerp(currentDist, targetDist, 0.02);
+    camera.position.setLength(newDist);
   });
 
   return null;
@@ -247,6 +245,20 @@ function CameraController() {
 // Globe — main component
 // ---------------------------------------------------------------------------
 export const Globe: React.FC = () => {
+  const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
+  const decisionOutcome = useSpaceStore((s) => s.decisionOutcome);
+
+  // Hold the view steady while there's something to watch, so the converging
+  // paths and the outcome read clearly; resume the gentle drift when idle.
+  const eventActive =
+    !!decisionOutcome ||
+    activeConjunctions.some(
+      (c) =>
+        c.status === 'detected' ||
+        c.status === 'negotiating' ||
+        c.status === 'pending_hitl'
+    );
+
   return (
     <div className="absolute inset-0 bg-black">
       <Canvas
@@ -260,6 +272,7 @@ export const Globe: React.FC = () => {
         <Earth />
         <SatelliteLayer />
         <ConjunctionMarker />
+        <ConjunctionPaths />
         <ConjunctionZone />
         <CollisionExplosion />
         <CameraController />
@@ -268,8 +281,8 @@ export const Globe: React.FC = () => {
           enablePan={false}
           minDistance={1.2}
           maxDistance={10}
-          autoRotate
-          autoRotateSpeed={0.5}
+          autoRotate={!eventActive}
+          autoRotateSpeed={0.3}
         />
       </Canvas>
     </div>

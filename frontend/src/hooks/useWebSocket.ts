@@ -5,9 +5,9 @@ import { WSMessage } from '../types';
 export const useWebSocket = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { 
-    updateSatellites, 
-    addFeedEvent, 
+  const {
+    updateSatellites,
+    addFeedEvent,
     setHitlRequest,
     updateMetrics,
     setActiveConjunctions,
@@ -16,6 +16,8 @@ export const useWebSocket = () => {
     setActiveMathTrace,
     clearTrail,
     setResolvedEvent,
+    setNegotiationBids,
+    resetForNewConjunction,
   } = useSpaceStore();
 
   useEffect(() => {
@@ -52,6 +54,9 @@ export const useWebSocket = () => {
               
             case 'conjunction_detected':
               addFeedEvent(msg);
+              // New event → clear stale visuals so destroyed sats reappear and
+              // any lingering green/outcome state from a prior run drops.
+              resetForNewConjunction();
               fetch('/api/conjunctions')
                 .then(res => res.json())
                 .then(data => setActiveConjunctions(data));
@@ -69,9 +74,13 @@ export const useWebSocket = () => {
                 }));
               break;
               
-            case 'negotiation_update':
+            case 'negotiation_update': {
               addFeedEvent(msg);
+              // Surface competing operator bids for the stage tracker.
+              const bids = (msg.payload as any)?.proposals;
+              if (Array.isArray(bids) && bids.length > 0) setNegotiationBids(bids);
               break;
+            }
               
             case 'hitl_request':
               addFeedEvent(msg);

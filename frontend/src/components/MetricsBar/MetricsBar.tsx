@@ -20,7 +20,7 @@ function formatSimTime(isoStr: string): string {
 }
 
 export const MetricsBar: React.FC = () => {
-  const { metrics, simSpeed, simTime } = useSpaceStore();
+  const { metrics, simSpeed, simTime, activeTab, setActiveTab } = useSpaceStore();
   const [pendingSpeed, setPendingSpeed] = useState<number | null>(null);
   const [displayTime, setDisplayTime] = useState<string>('');
 
@@ -72,8 +72,30 @@ export const MetricsBar: React.FC = () => {
     <div className="w-full bg-[#0a0f1e] border-b border-white/10 shrink-0 z-50">
       {/* Top row — metrics */}
       <div className="flex items-center justify-between px-6 h-12">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-6">
           <h1 className="text-xl font-bold tracking-wider text-white">SpaceATC</h1>
+          <div className="flex items-center space-x-1 bg-black/40 rounded-lg p-0.5 border border-white/5">
+            <button
+              onClick={() => setActiveTab('ground')}
+              className={`px-3 py-1 text-[10px] font-mono font-bold tracking-wider uppercase rounded transition-all cursor-pointer ${
+                activeTab === 'ground'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Ground Negotiation
+            </button>
+            <button
+              onClick={() => setActiveTab('reflex')}
+              className={`px-3 py-1 text-[10px] font-mono font-bold tracking-wider uppercase rounded transition-all cursor-pointer ${
+                activeTab === 'reflex'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Onboard Reflex
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center space-x-6 text-sm font-medium">

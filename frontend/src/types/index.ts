@@ -43,6 +43,7 @@ export interface ManeuverProposal {
   post_maneuver_miss_km: number;
   fuel_cost_units: number;
   bid_score: number;
+  computation_trace?: string[];
 }
 
 export interface Metrics {
@@ -64,6 +65,8 @@ export interface WSMessageSatelliteUpdate extends WSMessageBase {
   type: 'satellite_update';
   payload: {
     satellites: Satellite[];
+    sim_time?: string;
+    sim_speed?: number;
   };
 }
 
@@ -123,4 +126,39 @@ export interface EventLogItem {
   timestamp: string;
   type: string;
   payload: any;
+}
+
+/**
+ * Snapshot of a human decision (approve / veto), captured the instant the
+ * operator clicks — drives the immediate cinematic feedback on the globe and
+ * the full-screen outcome banner, independent of backend round-trip timing.
+ */
+export interface DecisionOutcome {
+  decision: 'approve' | 'veto';
+  eventId: string;
+  satA: string;
+  satB: string;
+  satelliteName: string;
+  operator: string;
+  deltaV: number;
+  burnDirection: 'prograde' | 'retrograde' | 'radial';
+  pcBefore: number;
+  pcAfter: number;
+  timestamp: number;
+}
+
+/** The high-level stage of the active conjunction, for the guided narrative UI. */
+export type PipelineStage =
+  | 'idle'
+  | 'detected'
+  | 'negotiating'
+  | 'awaiting'
+  | 'resolved'
+  | 'collision';
+
+/** A single operator's avoidance bid, surfaced from negotiation_update for the stage tracker. */
+export interface ManeuverBid {
+  operator: string;
+  delta_v_ms: number;
+  bid_score: number;
 }

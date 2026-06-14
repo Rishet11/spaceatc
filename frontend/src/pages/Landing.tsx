@@ -247,9 +247,9 @@ export const Landing: React.FC = () => {
           See it resolve a conjunction live.
         </h2>
         
-        <button 
+        <button
           onClick={() => navigate('/dashboard')}
-          className="z-10 bg-[#ef4444] hover:bg-red-500 text-white font-bold text-xl px-12 py-5 rounded-full shadow-[0_0_40px_rgba(239,68,68,0.4)] hover:shadow-[0_0_60px_rgba(239,68,68,0.6)] hover:scale-105 transition-all duration-300 flex items-center gap-3 group cursor-pointer"
+          className="z-10 bg-[#ef4444] hover:bg-red-500 text-white font-bold text-xl px-12 py-5 rounded-full shadow-lg transition-colors duration-200 flex items-center gap-3 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-300/60"
         >
           Launch SpaceATC
           <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />

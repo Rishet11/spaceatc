@@ -8,7 +8,7 @@ interface TooltipProps {
 
 export function Tooltip({ text, children, position = 'top' }: TooltipProps) {
   const [visible, setVisible] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<any>(null);
   
   return (
     <span 

@@ -4,7 +4,15 @@ import { ShieldAlert, Check, X, Clock } from 'lucide-react';
 import { Tooltip } from '../Tooltip';
 
 export const HITLPanel: React.FC = () => {
-  const { currentHitlRequest, setHitlRequest, activeConjunctions, setActiveMathTrace } = useSpaceStore();
+  const {
+    currentHitlRequest,
+    setHitlRequest,
+    activeConjunctions,
+    setActiveConjunctions,
+    setActiveMathTrace,
+    setResolvedEvent,
+    setDecisionOutcome,
+  } = useSpaceStore();
   const [timeLeft, setTimeLeft] = useState(30);
   const [mounted, setMounted] = useState(false);
 
@@ -41,12 +49,43 @@ export const HITLPanel: React.FC = () => {
 
   const handleAction = async (decision: 'approve' | 'veto') => {
     setMounted(false); // trigger slide down
+
+    const satA = conj?.sat_primary ?? proposal.satellite_name;
+    const satB = conj?.sat_secondary ?? '';
+
+    // Fire the cinematic outcome the instant the operator decides — the globe
+    // and the outcome banner react immediately, no backend round-trip required.
+    setDecisionOutcome({
+      decision,
+      eventId: event_id,
+      satA,
+      satB,
+      satelliteName: proposal.satellite_name,
+      operator: proposal.operator,
+      deltaV: proposal.delta_v_ms,
+      burnDirection: proposal.burn_direction,
+      pcBefore: pc_before,
+      pcAfter: pc_after,
+      timestamp: Date.now(),
+    });
+
     if (decision === 'approve') {
       setActiveMathTrace(proposal.computation_trace || []);
+      // Drive the green "resolved" visuals right away instead of waiting for
+      // the backend's maneuver_executed message.
+      if (conj) {
+        setResolvedEvent({ satA, satB, timestamp: Date.now() });
+      }
     }
+
     setTimeout(async () => {
       try {
         await fetch(`/api/hitl/${event_id}/${decision}`, { method: 'POST' });
+        // Refetch so the resolved/vetoed event leaves the active set. The backend
+        // only pushes maneuver_executed on approve, so veto would otherwise linger
+        // forever in the "active" filters across the globe components.
+        const res = await fetch('/api/conjunctions');
+        setActiveConjunctions(await res.json());
       } catch (e) {
         console.error(`Failed to ${decision}`, e);
       }
@@ -78,12 +117,12 @@ export const HITLPanel: React.FC = () => {
 
   return (
     <div 
-      className={`fixed bottom-0 left-0 right-0 h-[280px] bg-[#0f172a] border-t-4 border-red-500 z-50 text-white shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col font-mono transition-transform duration-300 ease-out ${mounted ? 'translate-y-0' : 'translate-y-full'}`}
+      className={`fixed bottom-0 left-0 right-0 h-auto min-h-[280px] bg-[#0f172a] border-t-4 border-red-500 z-50 text-white shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col font-mono transition-transform duration-300 ease-out ${mounted ? 'translate-y-0' : 'translate-y-full'}`}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 bg-black/20">
         <div className="flex items-center space-x-3 text-red-500 font-bold text-lg tracking-wider">
-          <ShieldAlert className="w-6 h-6 animate-pulse" />
+          <ShieldAlert className="w-6 h-6" />
           <Tooltip text="Human-In-The-Loop: every maneuver requires explicit human approval before execution. No AI acts without oversight." position="bottom">
             <span>MANEUVER AUTHORIZATION REQUIRED</span>
           </Tooltip>
@@ -95,9 +134,9 @@ export const HITLPanel: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1 p-6">
+      <div className="flex flex-col lg:flex-row flex-1 p-6 gap-5 lg:gap-0">
         {/* Left Column: Maneuver Details */}
-        <div className="w-1/3 flex flex-col justify-center space-y-4 text-sm border-r border-white/10 pr-6">
+        <div className="w-full lg:w-1/3 flex flex-col justify-center space-y-4 text-sm lg:border-r border-white/10 lg:pr-6">
           <div className="flex justify-between">
             <span className="text-gray-400">SATELLITE:</span>
             <span className="font-bold text-lg">{proposal.satellite_name}</span>
@@ -131,7 +170,7 @@ export const HITLPanel: React.FC = () => {
         </div>
 
         {/* Right Column: Risk Comparison */}
-        <div className="w-2/3 flex px-6 space-x-8 items-center justify-center">
+        <div className="w-full lg:w-2/3 flex px-0 lg:px-6 gap-4 lg:gap-8 items-center justify-center">
           {/* Before */}
           <div className="flex-1 bg-black/30 rounded-xl p-4 border border-white/10 flex flex-col items-center">
             <div className="text-gray-400 mb-2 font-bold tracking-widest text-xs">BEFORE MANEUVER</div>
@@ -188,17 +227,17 @@ export const HITLPanel: React.FC = () => {
         </div>
 
         <div className="flex-1 flex justify-center space-x-6 mt-2">
-          <button 
+          <button
             onClick={() => handleAction('approve')}
-            className="flex items-center space-x-3 px-12 py-4 bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold rounded shadow-[0_0_20px_rgba(34,197,94,0.5)] transition-all duration-200 animate-pulse"
+            className="flex items-center space-x-3 px-12 py-4 bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold rounded shadow-[0_0_16px_rgba(34,197,94,0.3)] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-300/60"
           >
             <Check className="w-6 h-6" />
             <span className="text-xl tracking-wider">APPROVE MANEUVER</span>
           </button>
 
-          <button 
+          <button
             onClick={() => handleAction('veto')}
-            className="flex items-center space-x-2 px-8 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded transition-colors"
+            className="flex items-center space-x-2 px-8 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-300/60"
           >
             <X className="w-5 h-5" />
             <span className="text-lg tracking-wider">VETO</span>

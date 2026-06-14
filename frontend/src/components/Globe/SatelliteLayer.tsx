@@ -32,6 +32,19 @@ export const SatelliteLayer: React.FC = () => {
   const satellites = useSpaceStore((state) => state.satellites);
   const destroyedSatellites = useSpaceStore((state) => state.destroyedSatellites);
   const resolvedEvent = useSpaceStore((state) => state.resolvedEvent);
+  const activeConjunctions = useSpaceStore((state) => state.activeConjunctions);
+
+  // Memoize highlighted satellite names for quick lookup
+  const highlightedSats = useMemo(() => {
+    const s = new Set<string>();
+    activeConjunctions.forEach(c => {
+      if (c.status === 'detected' || c.status === 'negotiating' || c.status === 'pending_hitl') {
+        s.add(c.sat_primary);
+        s.add(c.sat_secondary);
+      }
+    });
+    return s;
+  }, [activeConjunctions]);
 
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const tempObject = useMemo(() => new THREE.Object3D(), []);
@@ -100,8 +113,10 @@ export const SatelliteLayer: React.FC = () => {
       const pos = geodeticToThreeJS(sat.lat!, sat.lon!, sat.alt_km!);
       tempObject.position.copy(pos);
 
+      const isHighlighted = highlightedSats.has(sat.name!);
+      
       // Scale: highlighted = 2×, DEMO = 1.5×, normal = 1×
-      const scale = sat.is_highlighted
+      const scale = isHighlighted
         ? 2.0
         : sat.name?.includes('DEMO')
           ? 1.5
@@ -113,7 +128,7 @@ export const SatelliteLayer: React.FC = () => {
       // Color by operator / highlight state
       if (resolvedEvent && (sat.name === resolvedEvent.satA || sat.name === resolvedEvent.satB)) {
         tempColor.set('#22c55e'); // green: resolved
-      } else if (sat.is_highlighted) {
+      } else if (isHighlighted) {
         tempColor.set('#ef4444'); // red: conjunction
       } else if (sat.name?.includes('DEMO')) {
         tempColor.set('#ffffff'); // white: demo
@@ -162,10 +177,16 @@ export const SatelliteLayer: React.FC = () => {
         const satKey = Object.keys(satellites).find(k => satellites[k].name === name);
         const sat = satKey ? satellites[satKey] : null;
         
+        const isResolved = resolvedEvent && (name === resolvedEvent.satA || name === resolvedEvent.satB);
+        const isHighlighted = sat ? highlightedSats.has(sat.name!) : false;
+        const isImportant = sat && (isHighlighted || sat.name?.includes('DEMO') || isResolved);
+        
+        if (!isImportant) return null;
+
         let colorStr = '#ff9800';
         if (sat) {
-          if (resolvedEvent && (name === resolvedEvent.satA || name === resolvedEvent.satB)) colorStr = '#22c55e';
-          else if (sat.is_highlighted) colorStr = '#ef4444';
+          if (isResolved) colorStr = '#22c55e';
+          else if (isHighlighted) colorStr = '#ef4444';
           else if (sat.name?.includes('DEMO')) colorStr = '#ffffff';
           else if (sat.operator?.includes('SpaceX') || sat.operator?.includes('Starlink')) colorStr = '#4fc3f7';
         }
@@ -187,6 +208,7 @@ export const SatelliteLayer: React.FC = () => {
             transparent
             opacity={0.8}
             depthWrite={false}
+            dashed={false}
           />
         );
       })}
