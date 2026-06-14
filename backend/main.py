@@ -2,6 +2,37 @@
 backend/main.py — FastAPI Application Entrypoint
 """
 
+import os
+import sys
+
+# macOS OpenMP duplicate library crash fix: dynamically locate and preload PyTorch's libomp.dylib
+if sys.platform == "darwin" and "DYLD_INSERT_LIBRARIES" not in os.environ:
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+    try:
+        import torch
+        torch_lib_dir = os.path.join(os.path.dirname(torch.__file__), "lib")
+        torch_omp = os.path.join(torch_lib_dir, "libomp.dylib")
+        if os.path.exists(torch_omp):
+            os.environ["DYLD_INSERT_LIBRARIES"] = torch_omp
+            os.execve(sys.executable, [sys.executable] + sys.argv, os.environ)
+    except Exception:
+        pass
+
+# Mock out Ultralytics events/telemetry call to prevent background thread spawning (which causes segfaults in OpenMP on macOS)
+try:
+    import ultralytics.utils.events
+    ultralytics.utils.events.Events.__call__ = lambda *args, **kwargs: None
+except Exception:
+    pass
+
+# Limit OpenMP, PyTorch and OpenCV threads to 1 to prevent system mutex overflows on macOS CPU
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 import asyncio
 import logging
 import time as time_module
@@ -34,6 +65,7 @@ from backend.orbital.tle_client import fetch_and_parse, CELESTRAK_STARLINK_TLE
 from backend.orbital.propagator import propagate_at, eci_to_geodetic
 from backend.api.websocket import manager, websocket_endpoint
 from backend.api.routes import router as api_router, sat_cache
+from backend.api.reflex import router as reflex_router
 from backend.api.schemas import WSMessage, WSMessageType
 from backend.agents.graph import get_graph
 from backend.agents.nodes.tle_ingestion import _assign_operator
@@ -196,3 +228,4 @@ app.add_middleware(
 # Routes
 app.add_api_websocket_route("/ws", websocket_endpoint)
 app.include_router(api_router, prefix="")
+app.include_router(reflex_router, prefix="")
