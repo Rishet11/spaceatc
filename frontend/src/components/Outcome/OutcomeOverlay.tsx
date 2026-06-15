@@ -2,12 +2,6 @@ import React, { useEffect } from 'react';
 import { useSpaceStore } from '../../store/useSpaceStore';
 import { ShieldCheck, AlertTriangle, ArrowRight } from 'lucide-react';
 
-/**
- * Full-screen cinematic feedback for a human decision. Renders the instant the
- * operator clicks APPROVE / VETO (driven by store.decisionOutcome): a brief
- * colour flash plus a headline banner that spells out the consequence, so the
- * weight of the choice lands immediately. Auto-dismisses after ~4s.
- */
 export const OutcomeOverlay: React.FC = () => {
   const decisionOutcome = useSpaceStore(s => s.decisionOutcome);
   const setDecisionOutcome = useSpaceStore(s => s.setDecisionOutcome);

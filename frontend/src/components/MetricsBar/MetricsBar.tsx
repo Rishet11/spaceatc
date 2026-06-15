@@ -37,7 +37,6 @@ export const MetricsBar: React.FC = () => {
   }, [simTime, simSpeed]);
 
   useEffect(() => {
-    // Log the real SQL metrics as requested in Prompt 6
     console.log("Real SQL Metrics Update:", metrics);
   }, [metrics]);
 

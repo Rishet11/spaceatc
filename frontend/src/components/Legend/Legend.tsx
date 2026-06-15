@@ -8,7 +8,6 @@ const ITEMS = [
   { color: '#ff9800', label: 'Other operator' },
 ];
 
-/** Static color/marker key for the globe. Honest note keeps it credible. */
 export const Legend: React.FC = () => (
   <div className="pointer-events-none absolute bottom-3 left-3 z-30 font-mono bg-black/45 backdrop-blur-sm border border-white/10 rounded-md px-3 py-2">
     <div className="text-[9px] tracking-widest text-gray-500 mb-1.5">LEGEND</div>

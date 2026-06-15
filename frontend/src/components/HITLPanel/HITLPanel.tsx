@@ -53,8 +53,6 @@ export const HITLPanel: React.FC = () => {
     const satA = conj?.sat_primary ?? proposal.satellite_name;
     const satB = conj?.sat_secondary ?? '';
 
-    // Fire the cinematic outcome the instant the operator decides — the globe
-    // and the outcome banner react immediately, no backend round-trip required.
     setDecisionOutcome({
       decision,
       eventId: event_id,
@@ -71,8 +69,6 @@ export const HITLPanel: React.FC = () => {
 
     if (decision === 'approve') {
       setActiveMathTrace(proposal.computation_trace || []);
-      // Drive the green "resolved" visuals right away instead of waiting for
-      // the backend's maneuver_executed message.
       if (conj) {
         setResolvedEvent({ satA, satB, timestamp: Date.now() });
       }
@@ -81,9 +77,6 @@ export const HITLPanel: React.FC = () => {
     setTimeout(async () => {
       try {
         await fetch(`/api/hitl/${event_id}/${decision}`, { method: 'POST' });
-        // Refetch so the resolved/vetoed event leaves the active set. The backend
-        // only pushes maneuver_executed on approve, so veto would otherwise linger
-        // forever in the "active" filters across the globe components.
         const res = await fetch('/api/conjunctions');
         setActiveConjunctions(await res.json());
       } catch (e) {

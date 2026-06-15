@@ -128,11 +128,6 @@ export interface EventLogItem {
   payload: any;
 }
 
-/**
- * Snapshot of a human decision (approve / veto), captured the instant the
- * operator clicks — drives the immediate cinematic feedback on the globe and
- * the full-screen outcome banner, independent of backend round-trip timing.
- */
 export interface DecisionOutcome {
   decision: 'approve' | 'veto';
   eventId: string;
@@ -147,7 +142,6 @@ export interface DecisionOutcome {
   timestamp: number;
 }
 
-/** The high-level stage of the active conjunction, for the guided narrative UI. */
 export type PipelineStage =
   | 'idle'
   | 'detected'
@@ -156,7 +150,6 @@ export type PipelineStage =
   | 'resolved'
   | 'collision';
 
-/** A single operator's avoidance bid, surfaced from negotiation_update for the stage tracker. */
 export interface ManeuverBid {
   operator: string;
   delta_v_ms: number;

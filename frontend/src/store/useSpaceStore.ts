@@ -45,9 +45,7 @@ export interface SpaceState {
   setResolvedEvent: (event: { satA: string; satB: string; timestamp: number } | null) => void;
   setDecisionOutcome: (outcome: DecisionOutcome | null) => void;
   setNegotiationBids: (bids: ManeuverBid[] | null) => void;
-  /** Clear lingering resolved/green visuals and stale bid data once an event is over. */
   clearConjunctionVisuals: () => void;
-  /** Full reset before a new conjunction so destroyed sats reappear and stale visuals drop. */
   resetForNewConjunction: () => void;
   activeTab: 'ground' | 'reflex';
   setActiveTab: (tab: 'ground' | 'reflex') => void;

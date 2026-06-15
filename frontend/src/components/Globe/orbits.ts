@@ -1,24 +1,7 @@
 import * as THREE from 'three';
 
-/**
- * Orbital-path trajectory abstraction.
- *
- * Phase 1 ('sim'): derives an approximate *circular* orbit arc from a satellite's
- * instantaneous scene position + a velocity direction (recovered from recent
- * motion). Earth is centered at the origin with radius 1.0 scene unit, matching
- * `geodeticToThreeJS` in SatelliteLayer.tsx.
- *
- * Phase 3 ('backend'): swap `getPredictedPath` to consume real SGP4 samples from
- * a backend /api/trajectory endpoint and feed the same Vector3[] to the renderer.
- * Nothing else needs to change.
- */
 export const TRAJECTORY_SOURCE: 'sim' | 'backend' = 'sim';
 
-/**
- * Recover a normalized velocity *direction* from a satellite's recent positions
- * (newest last). Averages the last two deltas to smooth the ~2s WebSocket cadence.
- * Returns null when there isn't enough motion yet to be reliable.
- */
 export function deriveVelocity(points: THREE.Vector3[]): THREE.Vector3 | null {
   const n = points.length;
   if (n < 2) return null;
@@ -34,23 +17,14 @@ export function deriveVelocity(points: THREE.Vector3[]): THREE.Vector3 | null {
 }
 
 export interface PredictedPathOptions {
-  position: THREE.Vector3;        // current scene position
-  velocity: THREE.Vector3;        // normalized direction of travel
-  arcDeg?: number;                // how far forward to sweep
-  steps?: number;                 // segment count (smoothness)
-  phaseShiftDeg?: number;         // along-track offset (maneuver: ahead/behind)
-  radiusScale?: number;           // altitude scale (maneuver: raise/lower shell)
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  arcDeg?: number;
+  steps?: number;
+  phaseShiftDeg?: number;
+  radiusScale?: number;
 }
 
-/**
- * Sweep the position vector around the orbit-plane normal (N = P × V) to trace a
- * forward circular arc. A positive sweep follows the direction of travel (verified
- * analytically: d/dθ at θ=0 is parallel to V for a tangential velocity).
- *
- * `phaseShiftDeg` advances/retards the satellite along that same orbit (prograde /
- * retrograde burn); `radiusScale` lifts/drops the whole arc to a separated shell
- * (radial burn). Both are how the post-maneuver path is drawn diverging.
- */
 export function getPredictedPath({
   position,
   velocity,
@@ -78,11 +52,6 @@ export function getPredictedPath({
   return pts;
 }
 
-/**
- * Map an approved proposal to how its predicted path should deform.
- * Magnitudes are deliberately exaggerated for on-screen legibility — a real
- * ~0.1 m/s burn moves the path imperceptibly — and the UI labels them as such.
- */
 export function bentPathParams(
   burnDirection: 'prograde' | 'retrograde' | 'radial',
   deltaV_ms: number
@@ -93,7 +62,6 @@ export function bentPathParams(
   return { phaseShiftDeg: 0, radiusScale: 1.06 }; // radial: raise to a higher shell
 }
 
-/** Index along two equal-length sampled arcs where they come closest (visual TCA). */
 export function closestApproachIndex(a: THREE.Vector3[], b: THREE.Vector3[]): number {
   const len = Math.min(a.length, b.length);
   let best = 0;

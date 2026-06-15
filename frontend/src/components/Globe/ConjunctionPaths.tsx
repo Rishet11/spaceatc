@@ -19,14 +19,6 @@ const RED = '#ff4d4d';
 const AMBER = '#ffb347';
 const GREEN = '#22c55e';
 
-/**
- * Draws the predicted orbital paths for the active conjunction pair:
- *  - both arcs converge to a closest-approach marker while unresolved (red),
- *  - on APPROVE the maneuvering satellite's arc swings to a clean miss (green),
- *    leaving a faded ghost of the path it would have taken,
- *  - on VETO the arcs stay crossing (red) — CollisionExplosion handles impact.
- * Velocity is recovered from each satellite's recent motion (see orbits.ts).
- */
 export const ConjunctionPaths: React.FC = () => {
   const satellites = useSpaceStore((s) => s.satellites);
   const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
@@ -123,7 +115,6 @@ export const ConjunctionPaths: React.FC = () => {
 
   return (
     <group>
-      {/* Base forward arcs — red while threatening, dimmed amber once a maneuver replaces one */}
       {!aIsManeuver && (
         <Line
           points={arcA}

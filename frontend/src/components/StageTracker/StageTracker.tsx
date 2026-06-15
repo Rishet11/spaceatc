@@ -45,10 +45,6 @@ function useStage(): PipelineStage {
   return 'idle';
 }
 
-/**
- * Persistent pipeline tracker + plain-language caption so judges can follow the
- * autonomous flow at a glance: DETECT → NEGOTIATE → DECIDE → OUTCOME.
- */
 export const StageTracker: React.FC = () => {
   const stage = useStage();
   const idx = STAGE_INDEX[stage];

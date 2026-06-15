@@ -12,9 +12,7 @@ const EARTH_RADIUS = 1.0;
 const EARTH_TEXTURE_URL =
   'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg';
 
-// ---------------------------------------------------------------------------
 // Earth sphere with texture
-// ---------------------------------------------------------------------------
 const Earth = () => {
   const texture = useMemo(
     () => new THREE.TextureLoader().load(EARTH_TEXTURE_URL),
@@ -28,9 +26,7 @@ const Earth = () => {
   );
 };
 
-// ---------------------------------------------------------------------------
 // Starfield — 1000 random stars, single draw call
-// ---------------------------------------------------------------------------
 function Starfield() {
   const positions = useMemo(() => {
     const pos = new Float32Array(3000);
@@ -61,9 +57,7 @@ function Starfield() {
   );
 }
 
-// ---------------------------------------------------------------------------
 // ConjunctionZone — pulsing red zone + line + distance label
-// ---------------------------------------------------------------------------
 function ConjunctionZone() {
   const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
   const satellites = useSpaceStore((s) => s.satellites);
@@ -216,9 +210,7 @@ function ConjunctionZone() {
   );
 }
 
-// ---------------------------------------------------------------------------
 // CameraController — auto-zoom toward conjunction midpoint
-// ---------------------------------------------------------------------------
 function CameraController() {
   const { camera } = useThree();
   const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
@@ -241,15 +233,11 @@ function CameraController() {
   return null;
 }
 
-// ---------------------------------------------------------------------------
 // Globe — main component
-// ---------------------------------------------------------------------------
 export const Globe: React.FC = () => {
   const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
   const decisionOutcome = useSpaceStore((s) => s.decisionOutcome);
 
-  // Hold the view steady while there's something to watch, so the converging
-  // paths and the outcome read clearly; resume the gentle drift when idle.
   const eventActive =
     !!decisionOutcome ||
     activeConjunctions.some(

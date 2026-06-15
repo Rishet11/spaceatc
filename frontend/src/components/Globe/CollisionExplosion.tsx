@@ -34,8 +34,6 @@ export const CollisionExplosion: React.FC = () => {
     let triggered = false;
     const newExplosions: ExplosionData[] = [];
 
-    // 1. A human VETO is an immediate, guaranteed catastrophe — detonate at the
-    //    pair's midpoint right now, regardless of how far apart they currently are.
     if (
       decisionOutcome &&
       decisionOutcome.decision === 'veto' &&
@@ -59,7 +57,6 @@ export const CollisionExplosion: React.FC = () => {
       }
     }
 
-    // 2. Fallback: organic collision when an unresolved pair physically drifts together.
     activeConjunctions.forEach(c => {
       if (c.status === 'detected' || c.status === 'negotiating' || c.status === 'pending_hitl' || c.status === 'vetoed') {
         if (explodedEvents.current.has(c.event_id)) return;

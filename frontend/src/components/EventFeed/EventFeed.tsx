@@ -2,9 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useSpaceStore } from '../../store/useSpaceStore';
 import { Tooltip } from '../Tooltip';
 
-// ---------------------------------------------------------------------------
 // Badge colors by [TAG] prefix parsed from the message string
-// ---------------------------------------------------------------------------
 const BADGE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   'TLE INGESTION': { bg: 'bg-gray-700/60',    text: 'text-gray-300',   border: 'border-gray-500/40' },
   'DETECTOR':      { bg: 'bg-red-900/60',      text: 'text-red-300',    border: 'border-red-500/40'  },
@@ -59,18 +57,14 @@ function formatTime(isoStr: string): string {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Each row in the mission control log
-// ---------------------------------------------------------------------------
 interface LogEntry {
   id: string;
   timestamp: string;
   message: string;
 }
 
-// ---------------------------------------------------------------------------
 // EventFeed — reads from store.eventFeed, expands messages[] arrays from payloads
-// ---------------------------------------------------------------------------
 export const EventFeed: React.FC = () => {
   const { eventFeed } = useSpaceStore();
   const endRef = useRef<HTMLDivElement>(null);
