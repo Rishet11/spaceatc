@@ -24,7 +24,11 @@ export const useWebSocket = () => {
     let backoff = 1000;
     
     const connectWs = () => {
-      const ws = new WebSocket('ws://localhost:8000/ws');
+      const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = import.meta.env.DEV
+        ? 'ws://localhost:8000/ws'
+        : `${wsProto}://${window.location.host}/ws`;
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -54,8 +58,6 @@ export const useWebSocket = () => {
               
             case 'conjunction_detected':
               addFeedEvent(msg);
-              // New event → clear stale visuals so destroyed sats reappear and
-              // any lingering green/outcome state from a prior run drops.
               resetForNewConjunction();
               fetch('/api/conjunctions')
                 .then(res => res.json())

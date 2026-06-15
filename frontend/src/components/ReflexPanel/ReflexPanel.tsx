@@ -43,7 +43,7 @@ export const ReflexPanel: React.FC = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<HTMLDivElement | null>(null);
 
@@ -238,23 +238,40 @@ export const ReflexPanel: React.FC = () => {
 
   return (
     <div className="w-full h-full grid grid-cols-12 gap-6 p-6 overflow-y-auto bg-[#070a13] font-sans text-gray-200">
-      
+
+      {/* Context header for judges */}
+      <div className="col-span-12 border-b border-white/5 pb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-mono font-bold text-white">OrbitMind — Onboard Debris Detection &amp; Evasion</h2>
+            <p className="text-xs font-mono text-gray-400 mt-1">
+              YOLOv8 object detection + MobileNetV3 6-DOF pose estimation on satellite camera footage. Evasion fires when debris closes within 1.5 m.
+            </p>
+          </div>
+          <div className="flex items-center space-x-4 text-[10px] font-mono text-gray-500">
+            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span>SAFE (&gt;1.5 m)</span></span>
+            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /><span>WARNING</span></span>
+            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /><span>EVASION (&lt;1.5 m)</span></span>
+          </div>
+        </div>
+      </div>
+
       {/* 1. LEFT PANEL: Camera Feed & Video Controls (7 columns) */}
       <div className="col-span-12 xl:col-span-7 flex flex-col space-y-4">
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md relative flex flex-col flex-1 min-h-[450px]">
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
-              <Compass className="w-5 h-5 text-emerald-400 animate-spin-slow" />
+              <Compass className="w-5 h-5 text-emerald-400" />
               <span className="text-sm font-mono tracking-widest font-bold text-emerald-400">
-                ONBOARD CAM - TANGO SATELLITE
+                ONBOARD CAM — TANGO SATELLITE
               </span>
             </div>
             {/* Status Badge */}
             <div className="flex items-center space-x-2">
               <span className="text-xs font-mono text-gray-400">STATUS:</span>
               <span
-                className={`px-3 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider animate-pulse ${
+                className={`px-3 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider ${
                   frameData?.status === "CRITICAL"
                     ? "bg-red-600/20 text-red-500 border border-red-500/40"
                     : frameData?.status === "WARNING"
@@ -268,22 +285,24 @@ export const ReflexPanel: React.FC = () => {
           </div>
 
           {/* Video / Frame Feed Frame */}
-          <div className="flex-1 relative bg-black/60 rounded-xl overflow-hidden border border-white/5 flex items-center justify-center min-h-[350px]">
+          <div className={`flex-1 relative bg-black/60 rounded-xl overflow-hidden flex items-center justify-center min-h-[350px] transition-colors duration-300 ${
+            isEvading ? "border border-red-500/60" : "border border-white/5"
+          }`}>
             {isUploading && (
-              <div className="absolute inset-0 bg-black/95 backdrop-blur-sm z-40 flex flex-col items-center justify-center space-y-4">
-                <div className="relative w-16 h-16 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/90 z-40 flex flex-col items-center justify-center space-y-4">
+                <div className="relative w-12 h-12 flex items-center justify-center">
                   <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20" />
                   <div className="absolute inset-0 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin" />
-                  <Cpu className="w-6 h-6 text-emerald-400 animate-pulse" />
                 </div>
                 <div className="flex flex-col items-center space-y-1">
-                  <span className="text-sm font-mono font-bold tracking-widest text-emerald-400 uppercase animate-pulse">
-                    INGESTING DATA STREAM
-                  </span>
-                  <span className="text-[10px] font-mono text-gray-500">
-                    PARSING CONTROLLERS & INITIALIZING MODELS
-                  </span>
+                  <span className="text-sm font-mono text-emerald-400">Processing video...</span>
+                  <span className="text-[10px] font-mono text-gray-500">Initializing YOLO + pose estimation</span>
                 </div>
+              </div>
+            )}
+            {isEvading && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-red-950/80 border border-red-500/60 px-4 py-1.5 rounded text-xs font-mono text-red-400 font-bold tracking-wider">
+                EVASION ACTIVE — debris &lt;1.5 m
               </div>
             )}
 
@@ -299,29 +318,6 @@ export const ReflexPanel: React.FC = () => {
               </div>
             )}
 
-            {/* Scanning HUD Overlays */}
-            <div className="absolute inset-0 pointer-events-none border border-emerald-500/10">
-              {/* Target Bounding Box corner tags (decorative) */}
-              <div className="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-emerald-500/40" />
-              <div className="absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 border-emerald-500/40" />
-              <div className="absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-emerald-500/40" />
-              <div className="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-emerald-500/40" />
-              
-              {/* Scanline line animation */}
-              <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(16,185,129,0.03)_50%,rgba(0,0,0,0.25)_50%)] bg-[size:100%_4px]" />
-              <div className="absolute left-0 w-full h-[2px] bg-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.5)] animate-scanline" />
-
-              {/* Threat Warning Alert Overlay */}
-              {isEvading && (
-                <div className="absolute inset-0 border-2 border-red-500 animate-pulse bg-red-950/15 flex items-center justify-center">
-                  <div className="bg-black/80 px-6 py-3 border border-red-500 rounded-lg text-red-500 font-bold font-mono tracking-widest text-center shadow-lg">
-                    CRITICAL COLLISION THREAT
-                    <br />
-                    <span className="text-xs text-white">AUTONOMOUS EVASION TRIGGERED</span>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Player controls */}
@@ -395,7 +391,7 @@ export const ReflexPanel: React.FC = () => {
         </div>
 
         {/* Video Upload Control Panel */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md flex flex-col animate-fadeIn">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md flex flex-col">
           <div className="flex items-center space-x-2 border-b border-white/10 pb-3 mb-4">
             <Video className="w-5 h-5 text-emerald-400" />
             <h3 className="text-sm font-mono tracking-widest font-bold text-emerald-400 uppercase">
@@ -565,10 +561,6 @@ export const ReflexPanel: React.FC = () => {
             ref={terminalRef}
             className="flex-1 bg-black/60 rounded-xl border border-white/5 p-4 font-mono text-xs overflow-y-auto max-h-[300px] flex flex-col space-y-2 relative shadow-inner"
           >
-            <div className="absolute top-2 right-2 text-[9px] text-emerald-500/50 uppercase tracking-widest">
-              Llama-3B-Int4 // Gram-Constrained
-            </div>
-
             {logMessages.map((msg, i) => {
               let color = "text-gray-300";
               if (msg.startsWith("Search Query:") || msg.startsWith("Found Play:")) {
@@ -691,7 +683,7 @@ export const ReflexPanel: React.FC = () => {
               transform: 'translate(-50%, -50%)'
             }}
           >
-            <div className="w-2 h-2 bg-red-500 rounded-sm animate-spin-slow" />
+            <div className="w-2 h-2 bg-red-500 rounded-sm" />
             <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-mono text-red-400 uppercase tracking-widest whitespace-nowrap">
               Debris
             </span>

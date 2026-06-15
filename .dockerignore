@@ -1,0 +1,24 @@
+**/__pycache__
+**/*.pyc
+.git/
+.venv/
+venv/
+env/
+node_modules/
+frontend/node_modules/
+frontend/dist/
+*.db
+*.db-shm
+*.db-wal
+db_backup/
+backend_output.log
+backend/server.log
+deck/
+demo/
+.claude/
+.graphify/
+# OrbitMind: keep model weights + default video, drop training data
+OrbitMind/*.csv
+OrbitMind/*.ipynb
+OrbitMind/uploads/
+OrbitMind/output_inference.mp4

@@ -55,6 +55,8 @@ def get_sim_time() -> datetime:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 import sys
 import os
@@ -216,11 +218,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SpaceATC Backend", lifespan=lifespan)
 
-# CORS
+# CORS — defaults to any origin (the SPA is also served same-origin below, where
+# CORS is moot). Override with ALLOWED_ORIGINS="https://a.com,https://b.com".
+_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
+    allow_origins=_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -229,3 +233,18 @@ app.add_middleware(
 app.add_api_websocket_route("/ws", websocket_endpoint)
 app.include_router(api_router, prefix="")
 app.include_router(reflex_router, prefix="")
+
+# Serve the built frontend in single-container deploys. Registered last, so the
+# API routes and /ws above always win; everything else falls back to the SPA.
+_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+if os.path.isdir(_DIST):
+    _ASSETS = os.path.join(_DIST, "assets")
+    if os.path.isdir(_ASSETS):
+        app.mount("/assets", StaticFiles(directory=_ASSETS), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        candidate = os.path.join(_DIST, full_path)
+        if full_path and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(_DIST, "index.html"))

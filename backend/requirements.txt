@@ -10,3 +10,9 @@ python-dotenv>=1.0
 pydantic>=2.7
 pydantic-settings>=2.3
 aiosqlite>=0.20
+
+# OrbitMind Reflex inference (video pose). torch + torchvision are installed as
+# CPU-only wheels in the Dockerfile; the rest resolve normally.
+ultralytics>=8.2
+opencv-python-headless>=4.9
+python-multipart>=0.0.9

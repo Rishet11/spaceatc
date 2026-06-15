@@ -76,11 +76,9 @@ spaceatc.db*
 # ===========================
 # OrbitMind / Datasets
 # ===========================
+# Training data stays out; runtime weights + default video are committed via Git LFS (.gitattributes)
 OrbitMind/*.mat
-OrbitMind/*.pt
-OrbitMind/*.pth
 OrbitMind/*.csv
-OrbitMind/output_h264.mp4
 OrbitMind/output_inference.mp4
 OrbitMind/uploads/
 
