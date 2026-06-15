@@ -30,5 +30,8 @@ COPY backend/ ./backend/
 COPY OrbitMind/ ./OrbitMind/
 COPY --from=frontend /fe/dist ./frontend/dist
 
+# Grant write permissions to the OrbitMind folder so the non-root HF user can save video uploads
+RUN mkdir -p ./OrbitMind/uploads && chmod -R 777 ./OrbitMind
+
 EXPOSE 7860
 CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-7860}"]
