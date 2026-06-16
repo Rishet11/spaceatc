@@ -256,7 +256,7 @@ export const Landing: React.FC = () => {
         </button>
         
         <p className="z-10 mt-8 text-gray-500 font-mono text-sm tracking-wider">
-          Using real Starlink TLE data · No login required
+          Using real Starlink TLE data
         </p>
       </section>
     </div>
