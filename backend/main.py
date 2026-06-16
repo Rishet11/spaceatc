@@ -178,6 +178,25 @@ async def lifespan(app: FastAPI):
     logger.info("Fetching TLEs...")
     try:
         sats = await fetch_and_parse(CELESTRAK_STARLINK_TLE)
+        source = "network"
+
+        # Guarantee a non-empty globe: if the network fetch yielded nothing
+        # (blocked host, empty 200 response, parse failure), fall back to the
+        # bundled local cache rather than starting with zero satellites.
+        if not sats:
+            from pathlib import Path
+            from backend.orbital.tle_client import parse_tle_block
+            cache_path = Path(__file__).parent / "orbital" / "starlink_cache.tle"
+            if cache_path.exists():
+                sats = parse_tle_block(cache_path.read_text(encoding="utf-8"))
+                source = "local_cache"
+                logger.warning(
+                    "TLE network fetch returned no satellites; loaded %d from local cache (%s)",
+                    len(sats), cache_path.name,
+                )
+            else:
+                logger.error("TLE network fetch empty and local cache missing at %s", cache_path)
+
         top_100 = sats[:100]
         for name, satrec in top_100:
             nid = str(satrec.satnum)
@@ -202,9 +221,12 @@ async def lifespan(app: FastAPI):
                 "operator": op,
             }
             
-        logger.info(f"Loaded {len(top_100)} satellites into DB and cache.")
+        logger.info(
+            "TLE load complete: source=%s parsed=%d sat_cache=%d",
+            source, len(sats), len(sat_cache),
+        )
     except Exception as e:
-        logger.error(f"Failed to fetch TLEs: {e}")
+        logger.error(f"Failed to fetch TLEs: {e}", exc_info=True)
         
     # 3. start background tasks
     task1 = asyncio.create_task(broadcast_satellite_positions())

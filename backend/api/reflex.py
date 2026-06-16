@@ -357,27 +357,66 @@ async def upload_video(file: UploadFile = File(...)):
     finally:
         await file.close()
         
-    cap = cv2.VideoCapture(target_path)
+    def _cleanup():
+        try:
+            os.remove(target_path)
+        except Exception:
+            pass
+
+    # Open with the FFmpeg backend first (consistent with get_frame /
+    # get_total_frames), then fall back to the default backend.
+    cap = cv2.VideoCapture(target_path, cv2.CAP_FFMPEG)
+    open_backend = "ffmpeg"
     if not cap.isOpened():
         cap.release()
-        try:
-            os.remove(target_path)
-        except Exception:
-            pass
-        raise HTTPException(status_code=400, detail="Uploaded file is not a valid or readable video file.")
-        
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap = cv2.VideoCapture(target_path)
+        open_backend = "default"
+    if not cap.isOpened():
+        cap.release()
+        _cleanup()
+        logger.error("Upload rejected: OpenCV could not open %s with any backend", target_path)
+        raise HTTPException(
+            status_code=400,
+            detail="OpenCV/FFmpeg could not open this file. The codec or container may be unsupported in this build.",
+        )
+
+    # CAP_PROP_FRAME_COUNT is unreliable (often 0) for VFR, webm, and phone
+    # HEVC clips, so treat it as a hint — not a gate. Validate by actually
+    # decoding the first frame instead.
+    reported = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    ret, _ = cap.read()
+    if not ret:
+        cap.release()
+        _cleanup()
+        logger.error(
+            "Upload rejected: %s opened (backend=%s, reported_frames=%d) but no decodable frames",
+            target_path, open_backend, reported,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Video opened but no decodable frames were found. The file may be corrupt or use an unsupported codec.",
+        )
+
+    # Establish a usable frame count for the slider. Trust the metadata when
+    # it's positive; otherwise count by decoding forward (bounded).
+    if reported > 0:
+        total_frames = reported
+    else:
+        MAX_COUNT = 5000
+        count = 1  # already read one frame above
+        while count < MAX_COUNT:
+            ok, _ = cap.read()
+            if not ok:
+                break
+            count += 1
+        total_frames = count
     cap.release()
-    
-    if total_frames <= 0:
-        try:
-            os.remove(target_path)
-        except Exception:
-            pass
-        raise HTTPException(status_code=400, detail="Uploaded video contains no frames.")
-        
+
     CURRENT_VIDEO_PATH = target_path
-    logger.info(f"Reflex video switched to: {target_path} ({total_frames} frames)")
+    logger.info(
+        "Reflex video switched to: %s (backend=%s, reported=%d, total_frames=%d)",
+        target_path, open_backend, reported, total_frames,
+    )
     
     return {
         "status": "success",

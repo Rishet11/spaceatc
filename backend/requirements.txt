@@ -16,3 +16,4 @@ aiosqlite>=0.20
 ultralytics>=8.2
 opencv-python-headless>=4.9
 python-multipart>=0.0.9
+google-generativeai>=0.8

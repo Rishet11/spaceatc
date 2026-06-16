@@ -70,7 +70,12 @@ async def set_sim_speed(body: SimSpeedBody):
 @router.get("/health")
 async def health_check():
     sats = await get_all_satellites()
-    return {"status": "ok", "satellites": len(sats), "timestamp": datetime.now(tz=timezone.utc).isoformat()}
+    return {
+        "status": "ok",
+        "satellites": len(sats),
+        "sat_cache": len(sat_cache),
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+    }
 
 @router.get("/api/satellites")
 async def list_satellites():
@@ -244,8 +249,8 @@ async def demo_inject():
     # Store them in cache for propagation
     satrec_a = Satrec.twoline2rv(line1_a, line2_a)
     satrec_b = Satrec.twoline2rv(line1_b, line2_b)
-    sat_cache["99001"] = {"satrec": satrec_a}
-    sat_cache["99002"] = {"satrec": satrec_b}
+    sat_cache["99001"] = {"satrec": satrec_a, "name": name_a, "operator": demo_a["operator"]}
+    sat_cache["99002"] = {"satrec": satrec_b, "name": name_b, "operator": demo_b["operator"]}
     
     # 3. Run full pipeline
     global latest_session_id
