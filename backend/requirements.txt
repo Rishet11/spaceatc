@@ -1,6 +1,7 @@
 # SpaceATC Backend Dependencies — PRD Section 3
 fastapi>=0.111
 langgraph>=0.2
+langgraph-checkpoint-sqlite>=2.0
 sgp4>=2.23
 numpy>=1.26
 scipy>=1.13
