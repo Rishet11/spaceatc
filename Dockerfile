@@ -1,6 +1,7 @@
 # ---- Stage 1: build the frontend (Vite SPA) ----
 FROM node:20-slim AS frontend
 WORKDIR /fe
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
