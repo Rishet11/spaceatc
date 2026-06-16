@@ -26,7 +26,7 @@ export const useWebSocket = () => {
     const connectWs = () => {
       const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
       const wsUrl = import.meta.env.DEV
-        ? 'ws://localhost:8000/ws'
+        ? 'ws://localhost:7860/ws'
         : `${wsProto}://${window.location.host}/ws`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
