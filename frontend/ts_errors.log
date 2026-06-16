@@ -1,3 +1,0 @@
-error TS6053: File '/Users/rishetmehra/Desktop/Faraway/frontend/src/store.ts' not found.
-  The file is in the program because:
-    Matched by include pattern 'src' in '/Users/rishetmehra/Desktop/Faraway/frontend/tsconfig.json'
