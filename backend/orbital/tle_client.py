@@ -64,21 +64,22 @@ async def fetch_tle_group(url: str) -> tuple[str, str]:
             response.raise_for_status()
             text = response.text
             logger.info(
-                "Fetched %.1f kB — approx %d satellites",
+                "Fetched %.1f kB, approx %d satellites",
                 len(text) / 1024,
                 text.strip().count("\n") // 3,
             )
             return text, "network"
     except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+        reason = str(exc) or exc.__class__.__name__
         logger.warning(
-            "Failed to fetch TLE from CelesTrak: %s. Attempting fallback to local cache...",
-            exc,
+            "CelesTrak unreachable (%s); using bundled local cache.",
+            reason,
         )
         cache_path = Path(__file__).parent / "starlink_cache.tle"
         if cache_path.exists():
             text = cache_path.read_text(encoding="utf-8")
             logger.info(
-                "Successfully loaded TLE data from local cache (%s) — approx %d satellites",
+                "Loaded TLE data from bundled local cache (%s), approx %d satellites",
                 cache_path.name,
                 text.strip().count("\n") // 3,
             )

@@ -50,7 +50,7 @@ SpaceATC fills the uncoordinated handoff gap with **two layers of autonomy**:
 │         └─────────────────┴───────────────────┘             │
 │                          WebSocket                           │
 └──────────────────────────────┬──────────────────────────────┘
-                               │  ws://localhost:8000/ws
+                               │  ws://localhost:7860/ws
 ┌──────────────────────────────┴──────────────────────────────┐
 │                        BACKEND (FastAPI)                     │
 │                                                              │
@@ -101,7 +101,7 @@ SpaceATC fills the uncoordinated handoff gap with **two layers of autonomy**:
 ### Backend
 * **Python 3.11+**
 * **FastAPI 0.111+** (REST API + WebSocket server)
-* **LangGraph 0.2+** (Multi-agent orchestration + interrupt/checkpoint)
+* **LangGraph 1.x** (Multi-agent orchestration + interrupt/checkpoint)
 * **sgp4 2.23+** (Orbital propagation - Brandon Rhodes)
 * **numpy & scipy** (Vector math & bounded optimization)
 * **Gemini** (agent reasoning, behind a deterministic guardrail)
@@ -129,7 +129,7 @@ cd spaceatc/backend
 pip install -r requirements.txt
 cp ../.env.example ../.env
 # IMPORTANT: Add your GEMINI_API_KEY to .env before starting
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 7860
 ```
 
 ### Frontend
@@ -143,7 +143,7 @@ npm run dev
 ### Run Demo
 ```bash
 # With both servers running, trigger the demo injection:
-curl -X POST http://localhost:8000/api/demo/inject
+curl -X POST http://localhost:7860/api/demo/inject
 
 # The globe will auto-zoom to the conjunction.
 # Click APPROVE in the browser when the HITL panel appears to execute the maneuver.
