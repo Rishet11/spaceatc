@@ -66,18 +66,24 @@ async def ingest_tle(state: AgentState) -> dict:
             "maneuver_count": 0
         })
         
-    # Inject DEMO sats if they exist in sat_cache
+    # Inject DEMO sats if they exist in sat_cache. Operational attributes mirror
+    # what /api/demo/inject wrote to the DB: DEMO-SAT-B has prior maneuver
+    # history, so the negotiation winner is decided on a real attribute rather
+    # than an artificial delta-V difference (the two craft are co-orbital).
     from backend.api.routes import sat_cache
+    demo_meta = {
+        "99001": {"name": "DEMO-SAT-A", "operator": "Demo_A", "fuel_units": 100.0, "maneuver_count": 0},
+        "99002": {"name": "DEMO-SAT-B", "operator": "Demo_B", "fuel_units": 96.0, "maneuver_count": 2},
+    }
     for nid in ["99001", "99002"]:
         if nid in sat_cache:
-            op = "Demo_A" if nid == "99001" else "Demo_B"
-            name = "DEMO-SAT-A" if nid == "99001" else "DEMO-SAT-B"
-            processed_sats.insert(0, { # Insert at beginning so they are in top 20
+            meta = demo_meta[nid]
+            processed_sats.insert(0, {  # Insert at beginning so they are in top 20
                 "norad_id": nid,
-                "name": name,
-                "operator": op,
-                "fuel_units": 100.0,
-                "maneuver_count": 0
+                "name": meta["name"],
+                "operator": meta["operator"],
+                "fuel_units": meta["fuel_units"],
+                "maneuver_count": meta["maneuver_count"],
             })
 
     msg = f"[TLE INGESTION] Loaded {len(processed_sats)} active satellites from CelesTrak"
