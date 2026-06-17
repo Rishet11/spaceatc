@@ -297,9 +297,9 @@ export const ReflexPanel: React.FC = () => {
       <div className="col-span-12 border-b border-white/5 pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-mono font-bold text-white">OrbitMind — Autonomous Onboard Reflex (no ground contact)</h2>
+            <h2 className="text-base font-mono font-bold text-white">OrbitMind — Vision-Based Proximity Reflex</h2>
             <p className="text-xs font-mono text-gray-400 mt-1">
-              YOLO26 detection + MobileNetV3 6-DOF pose feed a closed decision loop whose every thruster command is validated against a deterministic safety envelope. Evasion fires autonomously when range crosses 1.5 m.
+              YOLO26 detection + MobileNetV3 6-DOF pose (metric, via the ESA SPEED+ camera model) feed a closed decision loop: classify the range band, retrieve an evasion playbook, reason with an LLM, and validate every thruster command against a deterministic safety envelope. Demonstrated on the ESA SPEED+ Tango spacecraft-proximity benchmark.
             </p>
           </div>
           <div className="flex items-center space-x-4 text-[10px] font-mono text-gray-500">
@@ -368,13 +368,13 @@ export const ReflexPanel: React.FC = () => {
               </div>
             )}
             {isEvading && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-red-950/80 border border-red-500/60 px-4 py-1.5 rounded text-xs font-mono text-red-400 font-bold tracking-wider">
-                EVASION ACTIVE — debris &lt;1.5 m
+              <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30 bg-red-950/80 border border-red-500/60 px-4 py-1.5 rounded text-xs font-mono text-red-400 font-bold tracking-wider">
+                EVASION ACTIVE — range &lt;1.5 m{replayMode ? " (simulated)" : ""}
               </div>
             )}
             {replayMode && (
-              <div className="absolute top-3 left-3 z-30 max-w-[55%] bg-sky-950/85 border border-sky-500/50 px-3 py-1.5 rounded text-[10px] font-mono text-sky-300 leading-snug">
-                DECISION-LOOP REPLAY · range is a swept demonstration input — detection &amp; decision logic are live
+              <div className="absolute top-0 left-0 right-0 z-30 bg-amber-500/90 text-black px-4 py-2 text-[11px] font-mono font-bold tracking-wide text-center leading-snug">
+                SIMULATED RANGE · Decision-Loop Replay sweeps the range to demonstrate the full policy. Detection + 6-DOF pose are live; the range is a demo input, not a measurement.
               </div>
             )}
             {bufferTotal > 0 && bufferReady < bufferTotal && (
@@ -596,7 +596,7 @@ export const ReflexPanel: React.FC = () => {
             {/* Threat Distance Slider Indicator */}
             <div className="col-span-2 border border-white/5 bg-black/40 rounded-xl p-4 flex flex-col">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-mono text-gray-400">CLOSEST APPROACH RANGE</span>
+                <span className="text-xs font-mono text-gray-400">CLOSEST APPROACH RANGE · {replayMode ? <span className="text-amber-400">SIMULATED</span> : <span className="text-emerald-400">MEASURED</span>}</span>
                 <span
                   className={`text-lg font-mono font-bold ${
                     isEvading ? "text-red-500" : isWarning ? "text-amber-500" : "text-emerald-500"
@@ -685,7 +685,7 @@ export const ReflexPanel: React.FC = () => {
           <div className="flex items-center space-x-2">
             <Activity className="w-5 h-5 text-emerald-400" />
             <h3 className="text-sm font-mono tracking-widest font-bold text-emerald-400 uppercase">
-              Evade Trajectory Path Visualizer (Reflex Action)
+              Evasion Schematic (illustrative, not to scale)
             </h3>
           </div>
           {isEvading && (

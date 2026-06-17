@@ -57,13 +57,14 @@ a coordinator arbitrating on a real cost signal, autonomous tool use (orbital pr
 graph that **pauses and checkpoints** for human authority and resumes deterministically. The
 LLM explains decisions; it does not *make* the safety-critical ones.
 
-## Layer 2 — OrbitMind Onboard Reflex (fully autonomous)
+## Layer 2 — OrbitMind Onboard Reflex (vision-based proximity operations)
 
-A per-frame perception→decision loop (`backend/api/reflex.py`, `reflex_playbook.py`) for the
-~1.2M uncatalogued objects no ground network tracks:
+A per-frame perception to decision loop (`backend/api/reflex.py`, `reflex_playbook.py`) for
+close-proximity encounters, demonstrated on the ESA SPEED+ Tango spacecraft-proximity benchmark:
 
-1. **Perceive** — YOLO26 detects the debris; MobileNetV3 regresses 11 keypoints; OpenCV
-   `solvePnP` recovers the 6-DOF pose (translation + quaternion).
+1. **Perceive** — YOLO26 detects the target; MobileNetV3 regresses 11 keypoints; OpenCV
+   `solvePnP` with the published SPEED+ camera model recovers the **metric** 6-DOF pose
+   (translation in metres + quaternion).
 2. **Classify** — `classify_threat()` maps range to a band **deterministically**
    (`>2.2m` monitor · `1.5–2.2m` prime · `<1.5m` evade). A safety reflex never lets an LLM
    move a threshold.

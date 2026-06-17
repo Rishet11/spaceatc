@@ -33,7 +33,7 @@ SpaceATC fills the uncoordinated handoff gap with **two layers of autonomy**:
 
 **Layer 1 — Ground Negotiation (multi-agent + HITL).** A LangGraph agent system that automatically coordinates maneuver decisions between competing satellite operators. Using true orbital physics (SGP4 and Clohessy-Wiltshire relative-motion equations), independent per-operator agents each propose and score an avoidance burn (delta-V); a coordinator selects the winner on a *real* cost signal (fuel + maneuver history), not an arbitrary tiebreak. The graph **interrupts** for Human-In-The-Loop approval and **checkpoints its state to SQLite** so it survives the pause — genuine agentic orchestration, not a single prompt. A real-time, WebGL 3D globe renders the live constellation and the SGP4-propagated conjunction tracks.
 
-**Layer 2 — OrbitMind Onboard Reflex (fully autonomous).** For the ~1.2 million uncatalogued objects nobody tracks, a satellite-side perception→decision loop: **YOLO26** detects the debris and **MobileNetV3** estimates its 6-DOF pose from a single camera, feeding an onboard decision engine that classifies the threat deterministically, reasons over a retrieval-grounded evasion playbook (LLM+RAG), and emits a thruster command **validated against a deterministic safety envelope** — the model never commands thrusters directly. All onboard, no ground contact.
+**Layer 2 — OrbitMind Onboard Reflex (vision-based proximity operations).** A satellite-side perception to decision loop for close-proximity encounters: **YOLO26** detects the target and **MobileNetV3** regresses its **6-DOF metric pose** (via the ESA SPEED+ camera model), feeding an onboard decision engine that classifies the range band deterministically, reasons over a retrieval-grounded evasion playbook (LLM+RAG), and emits a thruster command **validated against a deterministic safety envelope** so the model never commands thrusters directly. Demonstrated on the **ESA SPEED+ Tango spacecraft-proximity benchmark**.
 
 ---
 
@@ -108,7 +108,7 @@ SpaceATC fills the uncoordinated handoff gap with **two layers of autonomy**:
 * **SQLite / aiosqlite** (State persistence + LangGraph checkpoints)
 
 ### OrbitMind (Onboard Reflex)
-* **PyTorch + Ultralytics YOLO26** (debris detection)
+* **PyTorch + Ultralytics YOLO26** (target detection, ESA SPEED+ Tango)
 * **MobileNetV3** (6-DOF pose estimation head)
 * **OpenCV** (PnP pose solve + frame pipeline)
 
