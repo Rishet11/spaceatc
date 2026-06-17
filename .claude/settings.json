@@ -1,0 +1,20 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(jq -r '.tool_input.command // empty'); if printf '%s' \"$cmd\" | grep -qiE 'Co-Authored-By:.*Claude|Claude-Session:|anthropic\\.com|claude\\.ai'; then jq -n --arg msg 'Blocked: this command contains Claude or Anthropic attribution (Co-Authored-By, Claude-Session, anthropic.com, or claude.ai). Remove it and retry without that attribution.' '{hookSpecificOutput:{hookEventName:\"PreToolUse\",permissionDecision:\"deny\",permissionDecisionReason:$msg}}'; else echo '{}'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
