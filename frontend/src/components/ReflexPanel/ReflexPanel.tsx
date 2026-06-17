@@ -277,6 +277,20 @@ export const ReflexPanel: React.FC = () => {
   const isEvading = frameData?.status === "CRITICAL";
   const isWarning = frameData?.status === "WARNING";
 
+  // Live Decision card: surface what the agent chose this frame, pulled from the
+  // fields the frame response already carries (no extra request). The play name
+  // and verdict live inside decision_log; the command is structured.
+  const status = frameData?.status ?? "OFFLINE";
+  const bandLabel = status === "CRITICAL" ? "EVASION" : status;
+  const decisionLines = frameData?.decision_log ? frameData.decision_log.split('\n') : [];
+  const playMatch = decisionLines.find((l) => l.startsWith('Found Play:'))?.match(/Found Play: '([^']+)'/);
+  const playName = playMatch ? playMatch[1] : null;
+  const verdictLine = decisionLines.find((l) => l.startsWith('Verdict:'));
+  const verdict = verdictLine ? verdictLine.replace(/^Verdict:\s*/, '') : null;
+  const cmd = frameData?.dodge_command;
+  // An uploaded off-domain clip detects nothing; show that as scanning, not broken.
+  const noTarget = !!frameData && frameData.box === null;
+
   const t = totalFrames > 1 ? currentFrame / (totalFrames - 1) : 0;
   const satX = 50 + t * 900;
   let satY = 88;
@@ -297,8 +311,11 @@ export const ReflexPanel: React.FC = () => {
       <div className="col-span-12 border-b border-white/5 pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-mono font-bold text-white">OrbitMind — Vision-Based Proximity Reflex</h2>
-            <p className="text-xs font-mono text-gray-400 mt-1">
+            <h2 className="text-base font-mono font-bold text-white">OrbitMind · Vision-Based Proximity Reflex</h2>
+            <p className="text-sm text-gray-100 mt-1.5 max-w-3xl leading-snug">
+              An onboard satellite sees tumbling debris through its own camera, decides how to dodge it, and fires the maneuver itself, all in real time and with every thruster command safety-checked before it runs.
+            </p>
+            <p className="text-xs font-mono text-gray-400 mt-1.5 max-w-3xl">
               YOLO26 detection + MobileNetV3 6-DOF pose (metric, via the ESA SPEED+ camera model) feed a closed decision loop: classify the range band, retrieve an evasion playbook, reason with an LLM, and validate every thruster command against a deterministic safety envelope. Demonstrated on the ESA SPEED+ Tango spacecraft-proximity benchmark.
             </p>
           </div>
@@ -318,21 +335,21 @@ export const ReflexPanel: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Compass className="w-5 h-5 text-emerald-400" />
               <span className="text-sm font-mono tracking-widest font-bold text-emerald-400">
-                ONBOARD CAM — TANGO SATELLITE
+                ONBOARD CAM · TANGO SATELLITE
               </span>
             </div>
             {/* Replay toggle + status badge */}
             <div className="flex items-center space-x-3">
               <button
                 onClick={toggleReplay}
-                title="Sweep the relative range across threat bands to demonstrate the full autonomous decision policy. Detection and decision logic stay live; the range is a labeled swept input."
+                title="Scenario Playback walks the relative range across every threat band so the full autonomous decision policy is visible. Detection and decision logic stay live; only the closing range is scripted."
                 className={`px-3 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
                   replayMode
                     ? "bg-sky-600/30 text-sky-300 border-sky-500/50"
                     : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                {replayMode ? "● Decision-Loop Replay" : "Decision-Loop Replay"}
+                {replayMode ? "● Scenario Playback" : "Scenario Playback"}
               </button>
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-mono text-gray-400">STATUS:</span>
@@ -362,25 +379,49 @@ export const ReflexPanel: React.FC = () => {
                   <div className="absolute inset-0 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin" />
                 </div>
                 <div className="flex flex-col items-center space-y-1">
-                  <span className="text-sm font-mono text-emerald-400">Processing video...</span>
-                  <span className="text-[10px] font-mono text-gray-500">Initializing YOLO + pose estimation</span>
+                  {bufferTotal > 0 ? (
+                    <>
+                      <span className="text-sm font-mono text-emerald-400">
+                        Buffering {bufferReady}/{bufferTotal} frames ({Math.round((bufferReady / bufferTotal) * 100)}%)
+                      </span>
+                      <span className="text-[10px] font-mono text-gray-500">Running YOLO + pose estimation per frame</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm font-mono text-emerald-400">Processing video...</span>
+                      <span className="text-[10px] font-mono text-gray-500">Initializing YOLO + pose estimation</span>
+                    </>
+                  )}
                 </div>
               </div>
             )}
             {isEvading && (
               <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30 bg-red-950/80 border border-red-500/60 px-4 py-1.5 rounded text-xs font-mono text-red-400 font-bold tracking-wider">
-                EVASION ACTIVE — range &lt;1.5 m{replayMode ? " (simulated)" : ""}
+                EVASION ACTIVE · range &lt;1.5 m{replayMode ? " (simulated)" : ""}
               </div>
             )}
             {replayMode && (
               <div className="absolute top-0 left-0 right-0 z-30 bg-amber-500/90 text-black px-4 py-2 text-[11px] font-mono font-bold tracking-wide text-center leading-snug">
-                SIMULATED RANGE · Decision-Loop Replay sweeps the range to demonstrate the full policy. Detection + 6-DOF pose are live; the range is a demo input, not a measurement.
+                SCENARIO PLAYBACK · walks the satellite through every threat band (safe to evade) so you can watch the full autonomous policy. Detection and 6-DOF pose are live; only the closing range is scripted.
               </div>
             )}
             {bufferTotal > 0 && bufferReady < bufferTotal && (
               <div className="absolute bottom-3 left-3 z-30 flex items-center space-x-2 bg-black/70 border border-white/10 px-2.5 py-1 rounded text-[10px] font-mono text-emerald-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Buffering {Math.round((bufferReady / bufferTotal) * 100)}%</span>
+              </div>
+            )}
+
+            {noTarget && !isLoading && !isUploading && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                <div className="bg-black/70 border border-amber-500/40 rounded-lg px-4 py-2 text-center">
+                  <span className="text-xs font-mono font-bold text-amber-400">NO TARGET IN FRAME · SCANNING</span>
+                  {videoFileName && (
+                    <span className="block text-[10px] font-mono text-gray-400 mt-1 max-w-xs">
+                      This onboard model is trained for spacecraft proximity imagery (ESA SPEED+ / Tango).
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 
@@ -482,9 +523,12 @@ export const ReflexPanel: React.FC = () => {
             <label className="flex flex-col items-center justify-center border-2 border-dashed border-white/10 hover:border-emerald-500/50 bg-black/40 rounded-xl p-5 cursor-pointer transition-colors group relative">
               <Upload className="w-8 h-8 text-gray-400 group-hover:text-emerald-400 transition-colors mb-2" />
               <span className="text-xs font-mono text-gray-300 group-hover:text-white transition-colors text-center font-bold">
-                UPLOAD VIDEO STREAM
+                UPLOAD A SPEED+ STYLE CLIP
               </span>
-              <span className="text-[10px] font-mono text-gray-500 mt-1">
+              <span className="text-[10px] font-mono text-gray-500 mt-1 text-center leading-snug max-w-[16rem]">
+                Trained on ESA SPEED+ / Tango spacecraft imagery. Other footage may show no target, and it runs live so it is slower than the bundled clip.
+              </span>
+              <span className="text-[10px] font-mono text-gray-600 mt-1">
                 MP4, AVI, MOV, MKV, WEBM
               </span>
               <input
@@ -504,7 +548,7 @@ export const ReflexPanel: React.FC = () => {
                   {videoFileName || 'default_tango_dataset.mp4'}
                 </span>
                 <span className="text-xs font-mono text-gray-400 block mt-1">
-                  Resolution: Scaled to 224x224 for models
+                  Pipeline: YOLO26 800px → 6-DOF pose (224px crop)
                 </span>
               </div>
               
@@ -540,7 +584,61 @@ export const ReflexPanel: React.FC = () => {
 
       {/* 2. RIGHT PANEL: Pose Telemetry & Reasoning Engine (5 columns) */}
       <div className="col-span-12 xl:col-span-5 flex flex-col space-y-6">
-        
+
+        {/* 2.0 Agent Live Decision (hero) */}
+        <div className={`rounded-2xl p-5 backdrop-blur-md border transition-colors ${
+          isEvading
+            ? "bg-red-950/20 border-red-500/40"
+            : isWarning
+            ? "bg-amber-950/15 border-amber-500/30"
+            : "bg-emerald-950/10 border-emerald-500/25"
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-2">
+              <Cpu className="w-5 h-5 text-emerald-400" />
+              <span className="text-sm font-mono tracking-widest font-bold text-emerald-400 uppercase">
+                Live Decision
+              </span>
+            </div>
+            <span className={`px-3 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider border ${
+              isEvading
+                ? "bg-red-600/20 text-red-400 border-red-500/40"
+                : isWarning
+                ? "bg-amber-600/20 text-amber-400 border-amber-500/40"
+                : "bg-emerald-600/20 text-emerald-400 border-emerald-500/40"
+            }`}>
+              {bandLabel}
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            <div>
+              <span className="text-[10px] font-mono text-gray-500 uppercase block">Retrieved play</span>
+              <span className="text-sm font-mono text-white">{playName ?? "Awaiting telemetry"}</span>
+            </div>
+            {verdict && (
+              <div>
+                <span className="text-[10px] font-mono text-gray-500 uppercase block">Verdict</span>
+                <span className="text-sm font-mono text-gray-200">{verdict}</span>
+              </div>
+            )}
+            <div>
+              <span className="text-[10px] font-mono text-gray-500 uppercase block">Command</span>
+              {cmd ? (
+                <span className="text-sm font-mono font-bold text-red-400">
+                  EVADE · +{cmd.axis} · {cmd.delta_v_cm_s} cm/s · {cmd.duration_ms} ms · guardrail validated
+                </span>
+              ) : (
+                <span className="text-sm font-mono text-emerald-400">No burn. Passive tracking.</span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-white/10 text-[10px] font-mono text-gray-500 leading-snug">
+            deterministic band → RAG playbook → LLM reasoning → guardrail-validated command
+          </div>
+        </div>
+
         {/* 2.1 Pose Telemetry HUD */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md flex flex-col">
           <div className="flex items-center space-x-2 border-b border-white/10 pb-3 mb-4">
