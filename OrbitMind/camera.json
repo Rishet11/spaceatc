@@ -1,0 +1,15 @@
+{
+  "_source": "ESA/Stanford SLAB SPEED+ dataset camera model (1920x1200). Used so the PnP pose/range is a genuine metric measurement on a published benchmark, not synthetic units.",
+  "Nu": 1920,
+  "Nv": 1200,
+  "fx": 2988.5795,
+  "fy": 2988.3401,
+  "ccx": 960.0,
+  "ccy": 600.0,
+  "cameraMatrix": [
+    [2988.5795, 0.0, 960.0],
+    [0.0, 2988.3401, 600.0],
+    [0.0, 0.0, 1.0]
+  ],
+  "distCoeffs": [-0.22383016606, 0.51409797089, -0.00066499006, -0.00021404771, -0.13124227429]
+}

@@ -78,6 +78,8 @@ spaceatc.db*
 # ===========================
 # Training data stays out; runtime weights + default video are committed via Git LFS (.gitattributes)
 OrbitMind/*.mat
+# ...but the tiny Tango keypoint model IS a runtime asset (PnP needs it for metric pose)
+!OrbitMind/tangoPoints.mat
 OrbitMind/*.csv
 OrbitMind/output_inference.mp4
 OrbitMind/uploads/
