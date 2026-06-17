@@ -297,9 +297,9 @@ export const ReflexPanel: React.FC = () => {
       <div className="col-span-12 border-b border-white/5 pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-mono font-bold text-white">OrbitMind — Onboard Debris Detection &amp; Evasion</h2>
+            <h2 className="text-base font-mono font-bold text-white">OrbitMind — Autonomous Onboard Reflex (no ground contact)</h2>
             <p className="text-xs font-mono text-gray-400 mt-1">
-              YOLO26 object detection + MobileNetV3 6-DOF pose estimation on satellite camera footage. Evasion fires when debris closes within 1.5 m.
+              YOLO26 detection + MobileNetV3 6-DOF pose feed a closed decision loop whose every thruster command is validated against a deterministic safety envelope. Evasion fires autonomously when range crosses 1.5 m.
             </p>
           </div>
           <div className="flex items-center space-x-4 text-[10px] font-mono text-gray-500">
@@ -627,11 +627,16 @@ export const ReflexPanel: React.FC = () => {
 
         {/* 2.2 Onboard AI Reasoning Console */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md flex flex-col flex-1 min-h-[350px]">
-          <div className="flex items-center space-x-2 border-b border-white/10 pb-3 mb-4">
-            <Cpu className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-sm font-mono tracking-widest font-bold text-emerald-400 uppercase">
-              Onboard Decision Engine (LLM + RAG)
-            </h3>
+          <div className="flex items-start space-x-2 border-b border-white/10 pb-3 mb-4">
+            <Cpu className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="text-sm font-mono tracking-widest font-bold text-emerald-400 uppercase">
+                Onboard Decision Engine
+              </h3>
+              <p className="text-[10px] font-mono text-gray-500 mt-0.5">
+                deterministic classification → retrieval-grounded reasoning (LLM+RAG) → guardrail-validated command
+              </p>
+            </div>
           </div>
 
           {/* Terminal Console */}

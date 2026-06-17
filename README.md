@@ -16,6 +16,16 @@ Multi-agent autonomous satellite collision avoidance negotiation system.
 [![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)](https://reactjs.org/)
 [![Three.js](https://img.shields.io/badge/threejs-black?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
 
+> **🔴 Live demo:** https://huggingface.co/spaces/Rishet11/spaceatc &nbsp;·&nbsp; **Repo:** https://github.com/Rishet11/spaceatc &nbsp;·&nbsp; **Architecture:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) &nbsp;·&nbsp; **Demo video script:** [`docs/VIDEO_SCRIPT.md`](docs/VIDEO_SCRIPT.md)
+
+### ▶️ 60-second judge walkthrough
+1. Open the live demo — the globe loads ~100 real Starlink satellites from CelesTrak (live TLEs).
+2. Click **INJECT CONJUNCTION** → two craft go on a collision course; LangGraph agents detect it, each operator agent computes its own avoidance bid, and the coordinator selects the winner on real fuel/maneuver cost.
+3. The **HITL panel** slides up — click **APPROVE**; the maneuver executes, the orbit retrace changes, and the collision probability drops by orders of magnitude.
+4. Switch to **Onboard Reflex** → click **Decision-Loop Replay**: YOLO26 + 6-DOF pose track tumbling debris while the onboard agent walks scan → monitor → prime → **evade** and emits a guardrail-validated thruster command — fully autonomous, no ground contact.
+
+**Two layers of autonomy:** ground-side *multi-agent negotiation with a human in the loop*, and a *fully-autonomous onboard reflex* for the uncatalogued debris nobody tracks.
+
 ## 🚀 Problem
 
 SpaceX launched the Stargaze tracking system on January 29, 2026. It collects 30 million object observations per day across the Starlink fleet, generating Conjunction Data Messages (CDMs) and sending them to operators in minutes instead of hours. 
@@ -27,7 +37,11 @@ Two operators receive a CDM simultaneously and independently decide what to do. 
 
 ## 💡 Solution
 
-SpaceATC fills the uncoordinated handoff gap. It is a multi-agent autonomous negotiation system that automatically coordinates maneuver decisions between competing satellite operators. Using true orbital physics (SGP4 and Clohessy-Wiltshire relative-motion equations) mapped to LangGraph autonomous agents, SpaceATC proposes, scores, and selects optimal collision avoidance burns (delta-V). It features a real-time, WebGL-powered 3D visualization platform with a Human-In-The-Loop (HITL) approval dashboard.
+SpaceATC fills the uncoordinated handoff gap with **two layers of autonomy**:
+
+**Layer 1 — Ground Negotiation (multi-agent + HITL).** A LangGraph agent system that automatically coordinates maneuver decisions between competing satellite operators. Using true orbital physics (SGP4 and Clohessy-Wiltshire relative-motion equations), independent per-operator agents each propose and score an avoidance burn (delta-V); a coordinator selects the winner on a *real* cost signal (fuel + maneuver history), not an arbitrary tiebreak. The graph **interrupts** for Human-In-The-Loop approval and **checkpoints its state to SQLite** so it survives the pause — genuine agentic orchestration, not a single prompt. A real-time, WebGL 3D globe renders the live constellation and the SGP4-propagated conjunction tracks.
+
+**Layer 2 — OrbitMind Onboard Reflex (fully autonomous).** For the ~1.2 million uncatalogued objects nobody tracks, a satellite-side perception→decision loop: **YOLO26** detects the debris and **MobileNetV3** estimates its 6-DOF pose from a single camera, feeding an onboard decision engine that classifies the threat deterministically, reasons over a retrieval-grounded evasion playbook (LLM+RAG), and emits a thruster command **validated against a deterministic safety envelope** — the model never commands thrusters directly. All onboard, no ground contact.
 
 ---
 
@@ -95,10 +109,16 @@ SpaceATC fills the uncoordinated handoff gap. It is a multi-agent autonomous neg
 ### Backend
 * **Python 3.11+**
 * **FastAPI 0.111+** (REST API + WebSocket server)
-* **LangGraph 0.2+** (Multi-agent orchestration)
+* **LangGraph 0.2+** (Multi-agent orchestration + interrupt/checkpoint)
 * **sgp4 2.23+** (Orbital propagation - Brandon Rhodes)
 * **numpy & scipy** (Vector math & bounded optimization)
-* **SQLite / aiosqlite** (State persistence)
+* **Gemini** (agent reasoning, behind a deterministic guardrail)
+* **SQLite / aiosqlite** (State persistence + LangGraph checkpoints)
+
+### OrbitMind (Onboard Reflex)
+* **PyTorch + Ultralytics YOLO26** (debris detection)
+* **MobileNetV3** (6-DOF pose estimation head)
+* **OpenCV** (PnP pose solve + frame pipeline)
 
 ### Frontend
 * **React 18+** (via Vite for fast HMR)
@@ -141,7 +161,7 @@ curl -X POST http://localhost:8000/api/demo/inject
 
 ## 🔭 Future Scope
 * **RL-based bid optimization:** Move beyond deterministic equations to train Reinforcement Learning models for multi-objective optimization (fuel vs risk).
-* **Untracked debris reflex layer:** Sub-agent architecture designed specifically for <5cm uncatalogued debris evasion.
+* **OrbitMind on real hardware:** Port the onboard reflex (currently demonstrated on SPEED+ benchmark imagery) to an ARM64 flight-compute target (<6 GB), with the deterministic guardrail as the flight-safety boundary.
 * **Multi-operator trust framework:** Cryptographic signing of negotiation bids and maneuver commitments.
 * **Integration with LeoLabs:** Plugging directly into commercial tracking radar feeds.
 
