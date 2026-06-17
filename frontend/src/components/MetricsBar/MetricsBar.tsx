@@ -37,10 +37,6 @@ export const MetricsBar: React.FC = () => {
   }, [simTime, simSpeed]);
 
   useEffect(() => {
-    console.log("Real SQL Metrics Update:", metrics);
-  }, [metrics]);
-
-  useEffect(() => {
     const id = setInterval(() => {
       if (!simTimeRef.current) return;
       const elapsedMs = Date.now() - lastUpdateRef.current;
