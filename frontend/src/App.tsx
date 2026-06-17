@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Landing } from './pages/Landing';
 import { Globe } from './components/Globe/Globe';
@@ -10,14 +10,17 @@ import { OutcomeOverlay } from './components/Outcome/OutcomeOverlay';
 import { StageTracker } from './components/StageTracker/StageTracker';
 import { Legend } from './components/Legend/Legend';
 import { ReflexPanel } from './components/ReflexPanel/ReflexPanel';
+import { ToastHost } from './components/Toast/Toast';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useSpaceStore } from './store/useSpaceStore';
 import { Rocket } from 'lucide-react';
 
 function Dashboard() {
   const { updateSatellites, setActiveConjunctions, updateMetrics, activeTab } = useSpaceStore();
+  const addToast = useSpaceStore(s => s.addToast);
   const decisionOutcome = useSpaceStore(s => s.decisionOutcome);
   const isCollision = decisionOutcome?.decision === 'veto';
+  const [isInjecting, setIsInjecting] = useState(false);
   useWebSocket();
 
   useEffect(() => {
@@ -47,10 +50,25 @@ function Dashboard() {
   }, [updateSatellites, setActiveConjunctions, updateMetrics]);
 
   const handleDemoInject = async () => {
+    if (isInjecting) return;
+    setIsInjecting(true);
     try {
-      await fetch('/api/demo/inject', { method: 'POST' });
+      const res = await fetch('/api/demo/inject', { method: 'POST' });
+      let body: any = null;
+      try { body = await res.json(); } catch { /* non-JSON response */ }
+
+      if (!res.ok) {
+        addToast(body?.detail || `Inject failed (HTTP ${res.status})`, 'error');
+      } else if (body?.status === 'no_conjunction') {
+        addToast(body?.detail || 'Pipeline ran but no conjunction was detected.', 'info');
+      } else {
+        addToast('Conjunction injected — running negotiation…', 'success');
+      }
     } catch (e) {
       console.error("Failed to inject demo", e);
+      addToast('Could not reach the server to inject a conjunction.', 'error');
+    } finally {
+      setIsInjecting(false);
     }
   };
 
@@ -66,10 +84,11 @@ function Dashboard() {
 
             <button
               onClick={handleDemoInject}
-              className="absolute top-4 right-4 z-50 flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded shadow-lg border border-red-400 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300/60"
+              disabled={isInjecting}
+              className="absolute top-4 right-4 z-50 flex items-center space-x-2 bg-red-600 hover:bg-red-500 disabled:bg-red-900 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded shadow-lg border border-red-400 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300/60"
             >
-              <Rocket className="w-4 h-4" />
-              <span>INJECT CONJUNCTION</span>
+              <Rocket className={`w-4 h-4 ${isInjecting ? 'animate-pulse' : ''}`} />
+              <span>{isInjecting ? 'INJECTING…' : 'INJECT CONJUNCTION'}</span>
             </button>
           </div>
           <div className="w-[clamp(18rem,22vw,28rem)] border-l border-white/10 flex flex-col bg-black/40">
@@ -84,6 +103,7 @@ function Dashboard() {
       <HITLPanel />
       <MathPanel />
       <OutcomeOverlay />
+      <ToastHost />
     </div>
   );
 }

@@ -33,9 +33,11 @@ async def ingest_tle(state: AgentState) -> dict:
     """
     logger.info("Node: ingest_tle starting...")
     
-    # 1. Fetch & parse
-    satellites_raw = await fetch_and_parse(CELESTRAK_STARLINK_TLE)
-    
+    # 1. Fetch & parse (track where the data actually came from)
+    satellites_raw, source = await fetch_and_parse(
+        CELESTRAK_STARLINK_TLE, return_source=True
+    )
+
     # 2. Take first 100
     top_100 = satellites_raw[:100]
     
@@ -86,7 +88,12 @@ async def ingest_tle(state: AgentState) -> dict:
                 "maneuver_count": meta["maneuver_count"],
             })
 
-    msg = f"[TLE INGESTION] Loaded {len(processed_sats)} active satellites from CelesTrak"
+    source_label = {
+        "network": "CelesTrak (live)",
+        "local_cache": "local cache (CelesTrak unreachable)",
+        "unavailable": "no source available",
+    }.get(source, source)
+    msg = f"[TLE INGESTION] Loaded {len(processed_sats)} active satellites from {source_label}"
     msg2 = "[TLE INGESTION] Coverage: SpaceX Starlink, OneWeb, active payloads"
     new_messages = [msg, msg2]
 

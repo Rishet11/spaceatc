@@ -14,7 +14,11 @@ aiosqlite>=0.20
 
 # OrbitMind Reflex inference (video pose). torch + torchvision are installed as
 # CPU-only wheels in the Dockerfile; the rest resolve normally.
-ultralytics>=8.2
+# NOTE: the detector is YOLO26 (trained in OrbitMind/improved-yolo-spn.ipynb).
+# YOLO26 support landed in the ultralytics 8.3 line — an older wheel cannot load
+# best (1).pt. Keep this floor; the Docker build runs OrbitMind/check_model.py to
+# surface a stale wheel or unresolved LFS weights in the build log.
+ultralytics>=8.3.0
 opencv-python-headless>=4.9
 python-multipart>=0.0.9
 google-generativeai>=0.8

@@ -213,7 +213,7 @@ def main():
     parser = argparse.ArgumentParser(description="OrbitMind Video Inference Script")
     parser.add_argument("--video", type=str, default="output_h264.mp4", help="Path to input video")
     parser.add_argument("--output", type=str, default="output_inference.mp4", help="Path to save output video")
-    parser.add_argument("--yolo", type=str, default="best (1).pt", help="Path to YOLOv8 weights")
+    parser.add_argument("--yolo", type=str, default="best (1).pt", help="Path to YOLO26 weights")
     parser.add_argument("--kpt", type=str, default="keypoint_mobilenet.pth", help="Path to KeypointMobileNet weights")
     parser.add_argument("--camera_json", type=str, default="camera.json", help="Path to camera matrix JSON")
     parser.add_argument("--tango_mat", type=str, default="tangoPoints.mat", help="Path to tangoPoints MAT file")
@@ -234,7 +234,7 @@ def main():
     print(f"Using device: {CFG['device']}")
     
     # Load Models
-    print("Loading YOLOv8 model...")
+    print("Loading YOLO26 model...")
     yolo_model = YOLO(args.yolo)
     
     print("Loading KeypointMobileNet...")

@@ -1,0 +1,40 @@
+name: Sync to Hugging Face Space
+
+# Mirrors every push to `main` into the Hugging Face Space, carrying Git LFS
+# objects so OrbitMind's YOLO26 weights + demo video deploy as real binaries
+# (not LFS pointer stubs). GitHub and the Space are separate git repos — this
+# is what makes commits actually appear on the deployed app.
+#
+# One-time setup: add a repo secret named HF_TOKEN (a Hugging Face *write*
+# access token) under Settings → Secrets and variables → Actions.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history + LFS)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Pull LFS objects
+        run: git lfs pull
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::warning::HF_TOKEN secret is not set — skipping Hugging Face sync. Add an HF write token under repo Settings → Secrets → Actions to enable auto-deploy."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Force-push the current main onto the Space's main branch (LFS-aware).
+          git push --force "https://Rishet11:${HF_TOKEN}@huggingface.co/spaces/Rishet11/spaceatc" HEAD:main

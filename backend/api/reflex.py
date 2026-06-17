@@ -101,7 +101,7 @@ def lazy_load_models():
     device = CFG["device"]
     
     if YOLO_MODEL is None:
-        logger.info("Lazy loading YOLOv8 model for Reflex API...")
+        logger.info("Lazy loading YOLO26 model for Reflex API...")
         YOLO_MODEL = YOLO(YOLO_WEIGHTS)
         
     if KPT_MODEL is None:
@@ -174,9 +174,62 @@ def estimate_pose(kpts_2d, kp3d, camera_matrix, dist_coeffs):
     quat = rotation_matrix_to_quaternion(R)
     return quat, tvec
 
+# ---------------------------------------------------------------------------
+# Asset guards + frame cache
+# ---------------------------------------------------------------------------
+# Real weights/video are MB-scale; an unresolved Git LFS pointer is ~130 bytes.
+LFS_STUB_MAX_BYTES = 1024
+
+
+def _missing_or_stub(path: str) -> bool:
+    """True if a required binary is absent or an unresolved Git LFS pointer."""
+    return (not os.path.exists(path)) or os.path.getsize(path) < LFS_STUB_MAX_BYTES
+
+
+def _require_inference_assets():
+    """Raise a clear 503 if the model weights aren't really deployed (LFS stubs)."""
+    missing = []
+    if _missing_or_stub(YOLO_WEIGHTS):
+        missing.append("YOLO26 weights (best (1).pt)")
+    if _missing_or_stub(KPT_WEIGHTS):
+        missing.append("keypoint weights (keypoint_mobilenet.pth)")
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "OrbitMind inference assets are unavailable on this deployment: "
+                + ", ".join(missing)
+                + ". These are Git LFS files — deploy them as real binaries, not LFS pointers."
+            ),
+        )
+
+
+def _require_video(path: str):
+    """Raise a clear 503 if the active video is missing or an LFS stub."""
+    if _missing_or_stub(path):
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "The video feed is unavailable (missing or an unresolved Git LFS pointer). "
+                "Upload a video, or ensure the default clip is deployed as a real binary."
+            ),
+        )
+
+
+# Cache of fully-computed frame responses keyed by (video_path, frame_idx) so
+# scrubbing/replaying a frame is instant instead of re-running YOLO26 + pose on
+# CPU. Cleared whenever the active video changes (upload / reset).
+_FRAME_CACHE: dict[tuple[str, int], dict] = {}
+
+
+def _clear_frame_cache():
+    _FRAME_CACHE.clear()
+
+
 @router.get("/api/reflex/total_frames")
 async def get_total_frames():
     """Returns the total number of frames in the speed dataset video."""
+    _require_video(CURRENT_VIDEO_PATH)
     cap = cv2.VideoCapture(CURRENT_VIDEO_PATH, cv2.CAP_FFMPEG)
     if not cap.isOpened():
         cap = cv2.VideoCapture(CURRENT_VIDEO_PATH)
@@ -192,9 +245,19 @@ async def get_frame(frame_idx: int):
     """
     Seeks to frame_idx, runs YOLO + Keypoint detection + Pose estimation,
     overlays visualization on the frame, base64 encodes it, and returns the response.
+
+    Results are memoized per (video, frame) so replaying or scrubbing a frame is
+    instant instead of re-running the CPU pipeline.
     """
+    cache_key = (CURRENT_VIDEO_PATH, frame_idx)
+    cached = _FRAME_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    _require_video(CURRENT_VIDEO_PATH)
+    _require_inference_assets()
     lazy_load_models()
-    
+
     cap = cv2.VideoCapture(CURRENT_VIDEO_PATH, cv2.CAP_FFMPEG)
     if not cap.isOpened():
         cap = cv2.VideoCapture(CURRENT_VIDEO_PATH)
@@ -287,7 +350,7 @@ async def get_frame(frame_idx: int):
         status, threat_level, detected, distance, tvec_coords, quat
     )
 
-    return {
+    response = {
         "image": img_b64,
         "box": box_coords,
         "keypoints": kpts_list,
@@ -301,6 +364,8 @@ async def get_frame(frame_idx: int):
         "decision_log": decision_log,
         "dodge_command": dodge_command
     }
+    _FRAME_CACHE[cache_key] = response
+    return response
 
 @router.post("/api/reflex/upload")
 async def upload_video(file: UploadFile = File(...)):
@@ -380,6 +445,7 @@ async def upload_video(file: UploadFile = File(...)):
 
     CURRENT_VIDEO_PATH = target_path
     reset_decision_cache()  # fresh reflex reasoning for the new feed
+    _clear_frame_cache()    # invalidate memoized frames from the previous video
     logger.info(
         "Reflex video switched to: %s (backend=%s, reported=%d, total_frames=%d)",
         target_path, open_backend, reported, total_frames,
@@ -396,6 +462,7 @@ async def reset_video():
     global CURRENT_VIDEO_PATH
     CURRENT_VIDEO_PATH = VIDEO_PATH
     reset_decision_cache()  # fresh reflex reasoning for the default feed
+    _clear_frame_cache()    # invalidate memoized frames from the uploaded video
 
     cap = cv2.VideoCapture(CURRENT_VIDEO_PATH)
     total_frames = 0
