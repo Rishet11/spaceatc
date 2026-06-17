@@ -16,22 +16,14 @@ Multi-agent autonomous satellite collision avoidance negotiation system.
 [![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)](https://reactjs.org/)
 [![Three.js](https://img.shields.io/badge/threejs-black?style=for-the-badge&logo=three.js&logoColor=white)](https://threejs.org/)
 
-> **🔴 Live demo:** https://huggingface.co/spaces/Rishet11/spaceatc &nbsp;·&nbsp; **Repo:** https://github.com/Rishet11/spaceatc &nbsp;·&nbsp; **Architecture:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) &nbsp;·&nbsp; **Demo video script:** [`docs/VIDEO_SCRIPT.md`](docs/VIDEO_SCRIPT.md)
-
-### ▶️ 60-second judge walkthrough
-1. Open the live demo — the globe loads ~100 real Starlink satellites from CelesTrak (live TLEs).
-2. Click **INJECT CONJUNCTION** → two craft go on a collision course; LangGraph agents detect it, each operator agent computes its own avoidance bid, and the coordinator selects the winner on real fuel/maneuver cost.
-3. The **HITL panel** slides up — click **APPROVE**; the maneuver executes, the orbit retrace changes, and the collision probability drops by orders of magnitude.
-4. Switch to **Onboard Reflex** → click **Decision-Loop Replay**: YOLO26 + 6-DOF pose track tumbling debris while the onboard agent walks scan → monitor → prime → **evade** and emits a guardrail-validated thruster command — fully autonomous, no ground contact.
-
-**Two layers of autonomy:** ground-side *multi-agent negotiation with a human in the loop*, and a *fully-autonomous onboard reflex* for the uncatalogued debris nobody tracks.
+> **🔴 Live demo:** https://huggingface.co/spaces/Rishet11/spaceatc
 
 ## 🚀 Problem
 
-SpaceX launched the Stargaze tracking system on January 29, 2026. It collects 30 million object observations per day across the Starlink fleet, generating Conjunction Data Messages (CDMs) and sending them to operators in minutes instead of hours. 
+SpaceX launched the Stargaze tracking system on January 29, 2026. It collects 30 million object observations per day across the Starlink fleet, generating Conjunction Data Messages (CDMs) and sending them to operators in minutes instead of hours.
 
 **What Stargaze does:** Tells two operators "you are going to collide."  
-**What Stargaze does NOT do:** Tell them who maneuvers, by how much, or by when. 
+**What Stargaze does NOT do:** Tell them who maneuvers, by how much, or by when.
 
 Two operators receive a CDM simultaneously and independently decide what to do. The uncoordinated handoff is the critical gap in modern spaceflight safety. With a projected 1 million collision avoidance maneuvers per year by 2027, an uncoordinated system invites disaster.
 
