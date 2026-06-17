@@ -19,6 +19,7 @@ from backend.api.reflex_playbook import (
     validate_dodge_command,
     reflex_decision,
     reset_decision_cache,
+    swept_range,
     DELTA_V_MIN_CM_S,
     DELTA_V_MAX_CM_S,
 )
@@ -47,6 +48,20 @@ def test_guardrail():
     assert validate_dodge_command(None) is None
 
 
+def test_replay_sweep():
+    # Decision-Loop Replay sweeps the range so the agent walks every band.
+    total = 100
+    ranges = [swept_range(i, total) for i in range(total)]
+    # Monotonic non-increasing far -> near.
+    assert all(ranges[i] >= ranges[i + 1] for i in range(total - 1))
+    # Starts safe (MONITORING), ends in evasion (CRITICAL).
+    assert classify_threat(True, ranges[0])[0] == "MONITORING"
+    assert classify_threat(True, ranges[-1])[0] == "CRITICAL"
+    # Passes through every band so the demo shows the full autonomous policy.
+    bands = {classify_threat(True, r)[0] for r in ranges}
+    assert {"MONITORING", "WARNING", "CRITICAL"} <= bands
+
+
 async def _orchestrator():
     reset_decision_cache()
     for det, dist in [(False, 9.9), (True, 3.0), (True, 1.8), (True, 0.9)]:
@@ -65,6 +80,7 @@ def main():
     test_classification()
     test_retrieval()
     test_guardrail()
+    test_replay_sweep()
     asyncio.run(_orchestrator())
     print("ALL REFLEX DECISION ASSERTIONS PASSED ✓")
 
