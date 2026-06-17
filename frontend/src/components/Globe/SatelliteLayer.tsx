@@ -99,11 +99,6 @@ export const SatelliteLayer: React.FC = () => {
         !destroyedSatellites.includes(s.name)
     );
 
-    // Debug log (remove after confirming satellites render)
-    if (satsArray.length > 0 && Math.random() < 0.002) {
-      console.log('Satellites in store:', satsArray.length, satsArray[0]);
-    }
-
     const mesh = meshRef.current;
     let visibleCount = 0;
 
@@ -173,7 +168,8 @@ export const SatelliteLayer: React.FC = () => {
       {/* Render Trails */}
       {Array.from(trailsRef.current.entries()).map(([name, trail]) => {
         if (trail.length < 2) return null;
-        
+        if (destroyedSatellites.includes(name)) return null;
+
         const satKey = Object.keys(satellites).find(k => satellites[k].name === name);
         const sat = satKey ? satellites[satKey] : null;
         

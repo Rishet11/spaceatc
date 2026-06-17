@@ -128,8 +128,8 @@ async def broadcast_satellite_positions():
                 )
                 try:
                     await manager.broadcast(msg.model_dump())
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to broadcast satellite update: {e}")
             
             # Broadcast metrics every 5 seconds
             current_time = time_module.time()
@@ -143,8 +143,8 @@ async def broadcast_satellite_positions():
                 )
                 try:
                     await manager.broadcast(metrics_msg.model_dump())
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to broadcast metrics update: {e}")
                 
         except Exception as e:
             logger.error(f"Error in satellite propagation task: {e}")
@@ -158,8 +158,8 @@ async def drain_agent_ws_events():
             message = broadcast_queue.get_nowait()
             try:
                 await manager.broadcast(message)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to broadcast queued agent event: {e}")
         except asyncio.QueueEmpty:
             pass
         await asyncio.sleep(0.1)

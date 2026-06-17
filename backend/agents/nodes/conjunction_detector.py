@@ -2,6 +2,7 @@
 backend/agents/nodes/conjunction_detector.py — Node 2: Screen for conjunctions.
 """
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -56,7 +57,7 @@ async def detect_conjunctions(state: AgentState) -> dict:
                 t_end=t_end
             )
             
-            c_out = find_tca(c_input)
+            c_out = await asyncio.to_thread(find_tca, c_input)
             
             # 3. Check threshold
             if c_out.pc > PC_ALERT_THRESHOLD:
@@ -88,7 +89,8 @@ async def detect_conjunctions(state: AgentState) -> dict:
                     "pc": c_out.pc,
                     "relative_velocity_km_s": c_out.relative_velocity_km_s,
                     "status": "detected",
-                    "created_at": now.isoformat()
+                    "created_at": now.isoformat(),
+                    "session_id": state["session_id"],
                 })
                 
                 active_conjunctions.append(event_dict)

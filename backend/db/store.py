@@ -53,8 +53,13 @@ CREATE TABLE IF NOT EXISTS conjunctions (
     relative_velocity_km_s REAL NOT NULL,
     status                 TEXT NOT NULL DEFAULT 'detected',
     created_at             TEXT NOT NULL,
-    resolved_at            TEXT
+    resolved_at            TEXT,
+    session_id             TEXT
 );
+"""
+
+_ADD_SESSION_ID_COLUMN = """
+ALTER TABLE conjunctions ADD COLUMN session_id TEXT;
 """
 
 _CREATE_PROPOSALS = """
@@ -118,6 +123,11 @@ async def init_db() -> None:
         await conn.execute(_CREATE_PROPOSALS)
         for idx_sql in _CREATE_INDEXES:
             await conn.execute(idx_sql)
+        # Migrate older DBs created before session_id existed.
+        async with conn.execute("PRAGMA table_info(conjunctions)") as cursor:
+            columns = {row[1] for row in await cursor.fetchall()}
+        if "session_id" not in columns:
+            await conn.execute(_ADD_SESSION_ID_COLUMN)
         await conn.commit()
     logger.info("Database initialised at %s", _db_path())
 
@@ -191,11 +201,11 @@ async def insert_conjunction(event: dict) -> None:
             INSERT OR IGNORE INTO conjunctions
                 (event_id, sat_primary, sat_secondary, tca,
                  miss_distance_km, pc, relative_velocity_km_s,
-                 status, created_at, resolved_at)
+                 status, created_at, resolved_at, session_id)
             VALUES
                 (:event_id, :sat_primary, :sat_secondary, :tca,
                  :miss_distance_km, :pc, :relative_velocity_km_s,
-                 :status, :created_at, :resolved_at)
+                 :status, :created_at, :resolved_at, :session_id)
             """,
             {
                 "event_id":               event["event_id"],
@@ -208,9 +218,21 @@ async def insert_conjunction(event: dict) -> None:
                 "status":                 event.get("status", "detected"),
                 "created_at":             event["created_at"],
                 "resolved_at":            event.get("resolved_at"),
+                "session_id":             event.get("session_id"),
             },
         )
         await conn.commit()
+
+
+async def get_session_for_event(event_id: str) -> str | None:
+    """Return the LangGraph thread_id (session_id) that produced this conjunction."""
+    async with aiosqlite.connect(_db_path()) as conn:
+        await _configure(conn)
+        async with conn.execute(
+            "SELECT session_id FROM conjunctions WHERE event_id=?", (event_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+    return row["session_id"] if row else None
 
 
 async def update_conjunction_status(

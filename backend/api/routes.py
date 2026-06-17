@@ -13,6 +13,7 @@ from backend.db.store import (
     get_all_satellites,
     get_all_conjunctions,
     get_conjunction,
+    get_session_for_event,
     upsert_satellite,
     update_conjunction_status
 )
@@ -134,11 +135,14 @@ async def get_metrics():
         ) as c:
             resolved = (await c.fetchone())[0]
         
-        # Maneuvers executed (proposals that were winning + approved)
+        # Maneuvers executed (winning proposals on resolved conjunctions)
         async with db.execute(
-            "SELECT COUNT(*) FROM proposals WHERE bid_score = ("
+            "SELECT COUNT(*) FROM proposals p "
+            "INNER JOIN conjunctions c ON p.event_id = c.event_id "
+            "WHERE c.status = 'resolved' "
+            "AND p.bid_score = ("
             "SELECT MIN(bid_score) FROM proposals p2 "
-            "WHERE p2.event_id = proposals.event_id"
+            "WHERE p2.event_id = p.event_id"
             ")"
         ) as c:
             maneuvers = (await c.fetchone())[0]
@@ -171,6 +175,15 @@ async def demo_reset():
     from backend.config import settings
     # For demo reset, we clear DB tables and LangGraph checkpoints
     async with aiosqlite.connect(settings.sqlite_path) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM conjunctions WHERE status='pending_hitl'"
+        ) as c:
+            pending = (await c.fetchone())[0]
+        if pending:
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot reset while a conjunction is awaiting human approval",
+            )
         await db.execute("DELETE FROM conjunctions")
         await db.execute("DELETE FROM proposals")
         await db.execute("DELETE FROM checkpoints")
@@ -269,23 +282,15 @@ async def demo_inject():
 @router.post("/api/hitl/{event_id}/approve")
 async def hitl_approve(event_id: str):
     await update_conjunction_status(event_id, "pending_execution")
-    # For demo we find the active session by assuming we have it,
-    # or we can just fetch the latest session_id.
-    # We will assume event_id is the session_id for simplicity or we need to pass it.
-    # In LangGraph the thread_id is needed. Since we don't store it, we can query SQLite thread?
-    # Actually, the user says `Call resume_after_hitl(session_id, "approve")`.
-    # Let's just use a hardcoded demo thread id or pass it via body. We didn't add it to body.
-    # Let's search DB for latest proposal or just use the event_id as session_id when starting it?
-    # If run_pipeline uses session_id = event_id, it would be easy. But event_id is generated inside!
-    # I'll just use a fixed thread_id for MVP demo.
-    # The WS event maneuver_executed is sent by execute_maneuver node.
     global latest_session_id
-    await resume_after_hitl(latest_session_id, "approve")
+    session_id = await get_session_for_event(event_id) or latest_session_id
+    await resume_after_hitl(session_id, "approve")
     return {"status": "approved"}
 
 @router.post("/api/hitl/{event_id}/veto")
 async def hitl_veto(event_id: str):
     await update_conjunction_status(event_id, "vetoed")
     global latest_session_id
-    await resume_after_hitl(latest_session_id, "veto")
+    session_id = await get_session_for_event(event_id) or latest_session_id
+    await resume_after_hitl(session_id, "veto")
     return {"status": "vetoed"}

@@ -46,6 +46,7 @@ export const ReflexPanel: React.FC = () => {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<HTMLDivElement | null>(null);
+  const fetchSeqRef = useRef<number>(0);
 
   // 1. Fetch total frame count on mount
   useEffect(() => {
@@ -63,11 +64,13 @@ export const ReflexPanel: React.FC = () => {
 
   // 2. Fetch single frame data
   const fetchFrame = async (idx: number) => {
+    const seq = ++fetchSeqRef.current;
     setIsLoading(true);
     try {
       const res = await fetch(`/api/reflex/frame/${idx}`);
       if (!res.ok) throw new Error(`Failed to fetch frame ${idx}`);
       const data: FrameData = await res.json();
+      if (seq !== fetchSeqRef.current) return; // a newer request superseded this one
       setFrameData(data);
       setError(null);
 
@@ -79,7 +82,7 @@ export const ReflexPanel: React.FC = () => {
           return updated.slice(-150); // Keep last 150 lines
         });
       }
-      
+
       // Auto scroll terminal container only (avoiding page-level scroll)
       setTimeout(() => {
         if (terminalRef.current) {
@@ -88,9 +91,10 @@ export const ReflexPanel: React.FC = () => {
       }, 50);
 
     } catch (err: any) {
+      if (seq !== fetchSeqRef.current) return;
       setError(err.message || "Failed to load frame data");
     } finally {
-      setIsLoading(false);
+      if (seq === fetchSeqRef.current) setIsLoading(false);
     }
   };
 

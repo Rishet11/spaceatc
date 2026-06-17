@@ -89,6 +89,11 @@ function ConjunctionZone() {
   const [isResolving, setIsResolving] = React.useState(false);
 
   useEffect(() => {
+    if (activePair) {
+      // A new conjunction is active — don't show the stale "resolved" visual.
+      setIsResolving(false);
+      return;
+    }
     if (resolvedEvent) {
       setIsResolving(true);
       const timer = setTimeout(() => setIsResolving(false), 3000);
@@ -96,7 +101,7 @@ function ConjunctionZone() {
     } else {
       setIsResolving(false);
     }
-  }, [resolvedEvent]);
+  }, [resolvedEvent, activePair]);
 
   useFrame((state) => {
     if (!sphereRef.current || !posA || !posB) return;

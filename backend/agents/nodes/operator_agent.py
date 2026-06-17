@@ -35,31 +35,44 @@ async def generate_operator_bid(state: AgentState) -> dict:
     tca = datetime.fromisoformat(current_event["tca"])
     
     proposals = []
-    
+
     # 2. Call compute_minimum_delta_v for each operator — real CW math
     for i, (maneuvering_sat, other_sat) in enumerate([(sat1, sat2), (sat2, sat1)]):
-        
+
         from backend.api.routes import sat_cache
         m_cache = sat_cache.get(maneuvering_sat["norad_id"], {})
         o_cache = sat_cache.get(other_sat["norad_id"], {})
-        
+        m_satrec = m_cache.get("satrec")
+        o_satrec = o_cache.get("satrec")
+
+        if m_satrec is None or o_satrec is None:
+            logger.warning(
+                "Missing satrec for %s or %s; aborting bid generation for event %s",
+                maneuvering_sat.get("norad_id"), other_sat.get("norad_id"), current_event_id,
+            )
+            return {"phase": "resolved"}
+
         m_input = ManeuverInput(
-            sat_maneuvering_satrec=m_cache.get("satrec"),
-            sat_other_satrec=o_cache.get("satrec"),
+            sat_maneuvering_satrec=m_satrec,
+            sat_other_satrec=o_satrec,
             tca=tca,
             burn_lead_time_minutes=60
         )
-        
-        m_out = compute_minimum_delta_v(m_input)
-        
+
+        try:
+            m_out = compute_minimum_delta_v(m_input)
+        except ValueError as e:
+            logger.error("compute_minimum_delta_v failed for event %s: %s", current_event_id, e)
+            return {"phase": "resolved"}
+
         # Slightly increase second satellite's effective delta-V for demo variety
         # (in real life they would get different results due to orbital geometry)
         dv = m_out.delta_v_ms * (1.0 + (0.1 * i))
-        
+
         # 3. Compute bid_score = delta_v_ms + (maneuver_count * 0.1)
         maneuver_count = maneuvering_sat.get("maneuver_count", 0)
         bid_score = dv + (maneuver_count * 0.1)
-        
+
         proposal = {
             "proposal_id": str(uuid.uuid4()),
             "event_id": current_event_id,
@@ -75,10 +88,13 @@ async def generate_operator_bid(state: AgentState) -> dict:
             "computation_trace": m_out.trace,
             "maneuvering_sat_obj": maneuvering_sat # Store for executor
         }
-        
-        await insert_proposal({k: v for k, v in proposal.items() if k not in ["maneuvering_sat_obj", "computation_trace"]})
+
         proposals.append(proposal)
-        
+
+    # Both proposals computed successfully — persist them together.
+    for proposal in proposals:
+        await insert_proposal({k: v for k, v in proposal.items() if k not in ["maneuvering_sat_obj", "computation_trace"]})
+
     # Queue bids_received WS event
     bid_messages = []
     for p in proposals:
