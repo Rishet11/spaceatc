@@ -30,11 +30,28 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          # Fail loudly (red X) instead of a silent "success" so a broken deploy
+          # is never mistaken for a working one — that confusion is exactly what
+          # left the Space running stale code while fixes piled up on GitHub.
           if [ -z "$HF_TOKEN" ]; then
-            echo "::warning::HF_TOKEN secret is not set — skipping Hugging Face sync. Add an HF write token under repo Settings → Secrets → Actions to enable auto-deploy."
-            exit 0
+            echo "::error::HF_TOKEN secret is NOT set, so the Hugging Face Space will not update. Create an HF *write* token (huggingface.co → Settings → Access Tokens → New token → role: Write) and add it as repo secret HF_TOKEN (Settings → Secrets and variables → Actions)."
+            exit 1
           fi
+
+          # Preflight: verify the token actually works *before* the push, so an
+          # expired / read-only / wrong-scope token produces a clear message
+          # instead of git's cryptic "Invalid username or password".
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $HF_TOKEN" \
+            https://huggingface.co/api/whoami-v2)
+          if [ "$code" != "200" ]; then
+            echo "::error::HF_TOKEN is set but invalid/expired (whoami-v2 returned HTTP $code). Regenerate a *write* token at huggingface.co → Settings → Access Tokens and update the HF_TOKEN secret."
+            exit 1
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # Force-push the current main onto the Space's main branch (LFS-aware).
-          git push --force "https://Rishet11:${HF_TOKEN}@huggingface.co/spaces/Rishet11/spaceatc" HEAD:main
+          # Username can be anything when a valid token is supplied as the password.
+          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/Rishet11/spaceatc" HEAD:main
+          echo "✅ Pushed $(git rev-parse --short HEAD) to the Hugging Face Space. Watch the build at https://huggingface.co/spaces/Rishet11/spaceatc"
