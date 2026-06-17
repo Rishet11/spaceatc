@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     space_track_username: str = ""
     space_track_password: str = ""
 
-    # --- LLM API key (Gemini only — never OpenAI / Anthropic) ---
+    # --- LLM API key (Gemini) ---
     gemini_api_key: str = ""
 
     # --- Database ---
