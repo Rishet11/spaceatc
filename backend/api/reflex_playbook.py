@@ -217,7 +217,7 @@ async def _llm_reflex_decision(
         import google.generativeai as genai
 
         genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel(settings.gemini_model)
         play_text = "\n".join(
             f"- {p['name']}: {p['action']} (applies when {p['applies_when']})" for p in plays
         ) or "- (no target; continue scanning)"

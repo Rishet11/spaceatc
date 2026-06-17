@@ -26,8 +26,13 @@ class Settings(BaseSettings):
     space_track_username: str = ""
     space_track_password: str = ""
 
-    # --- LLM API key (Gemini) ---
+    # --- LLM (Gemini) ---
+    # gemini-2.5-flash is the current stable served model. Note 1.5-flash was
+    # retired and 2.0-flash was shut down on 2026-06-01, which is what produced
+    # the 404s in the deploy logs. Override via the GEMINI_MODEL env var if the
+    # deployment key serves a different model (no code change needed).
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
 
     # --- Database ---
     sqlite_path: str = "./spaceatc.db"
