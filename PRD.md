@@ -6,7 +6,7 @@
 
 ## 0. Read This First
 
-This PRD is written for AI coding agents (Claude Code, Codex) and human developers. Every section is implementation-ready. Do not invent schemas, endpoints, or data formats — follow exactly what is specified here. If something is ambiguous, check the Demo Script in Section 10 first, then the architecture diagram in Section 4.
+This PRD is written for AI coding agents and human developers. Every section is implementation-ready. Do not invent schemas, endpoints, or data formats — follow exactly what is specified here. If something is ambiguous, check the Demo Script in Section 10 first, then the architecture diagram in Section 4.
 
 **The single most important constraint:** The demo must show real satellite names (STARLINK-XXXX) from real CelesTrak data, autonomous agent negotiation happening visibly, and a collision probability drop. Everything else is secondary.
 
@@ -1132,8 +1132,8 @@ CELESTRAK_BASE_URL=https://celestrak.org/NORAD/elements/gp.php
 SPACE_TRACK_USERNAME=           # Optional backup (register at space-track.org NOW)
 SPACE_TRACK_PASSWORD=           # Optional backup
 
-OPENAI_API_KEY=                 # For LLM calls in agent prompts (Claude or GPT-4o)
-ANTHROPIC_API_KEY=              # Alternative to OpenAI
+OPENAI_API_KEY=                 # For LLM calls in agent prompts
+ANTHROPIC_API_KEY=              # Alternative LLM provider
 
 SQLITE_PATH=./spaceatc.db
 WEBSOCKET_PING_INTERVAL=5       # seconds
