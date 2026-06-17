@@ -38,9 +38,11 @@ working on the live build — no slideware, no faked steps. Record the live Spac
 **Action 4 (1:20):** HITL panel slides up showing ΔV, Pc before/after.
 > "The agent graph then *interrupts itself* and checkpoints to SQLite, waiting for human
 > authority. No maneuver executes without a person."
-**Action 5 (1:30):** Click **APPROVE**. Orbit retrace changes; Pc collapses.
-> "I approve. The burn executes, the orbit changes, and collision probability drops from one
-> in a few hundred to one in millions. That's the handoff Stargaze can't do — automated."
+**Action 5 (1:30):** Click **APPROVE**. The maneuvered satellite's track redraws; the
+before→after Pc panel updates.
+> "I approve. The burn executes, the satellite's track redraws, and — read the panel —
+> collision probability drops from one in a few hundred to one in millions. That's the handoff
+> Stargaze can't do, automated end to end."
 
 ## 1:50–3:00 · LIVE DEMO — Layer 2 (OrbitMind, the differentiator)
 **Action 6 (1:50):** Switch to **Onboard Reflex**. Default feed shows YOLO box + 6-DOF wireframe.
