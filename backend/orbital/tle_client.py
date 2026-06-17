@@ -32,26 +32,33 @@ CELESTRAK_ACTIVE_TLE = (
 # ---------------------------------------------------------------------------
 
 
-async def fetch_tle_group(url: str) -> str:
+async def fetch_tle_group(url: str) -> tuple[str, str]:
     """Fetch a 3LE block from CelesTrak.
 
     Args:
         url: Full CelesTrak endpoint URL (FORMAT=TLE).
 
     Returns:
-        Raw TLE text — one 3-line block per satellite, separated by newlines.
+        ``(raw_tle_text, source)`` where ``source`` is ``"network"`` when the
+        data came from CelesTrak or ``"local_cache"`` when it came from the
+        bundled fallback file. Knowing the source lets callers log honestly.
 
     Raises:
         httpx.HTTPStatusError: on non-2xx responses if cache fallback fails.
-        httpx.TimeoutException:  if the request exceeds 30 s and cache fallback fails.
+        httpx.TimeoutException:  if the request times out and cache fallback fails.
     """
     from pathlib import Path
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
+    # Bounded timeout: CelesTrak either answers quickly or is unreachable
+    # (egress-blocked / rate-limited). A short connect+read budget means we fall
+    # back to the local cache in seconds instead of hanging ~30 s, which is what
+    # made the INJECT button feel dead on restricted networks.
+    timeout = httpx.Timeout(8.0, connect=5.0)
     try:
-        async with httpx.AsyncClient(timeout=30.0, headers=headers) as client:
+        async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
             logger.info("Fetching TLE data from %s", url)
             response = await client.get(url)
             response.raise_for_status()
@@ -61,7 +68,7 @@ async def fetch_tle_group(url: str) -> str:
                 len(text) / 1024,
                 text.strip().count("\n") // 3,
             )
-            return text
+            return text, "network"
     except (httpx.HTTPStatusError, httpx.RequestError) as exc:
         logger.warning(
             "Failed to fetch TLE from CelesTrak: %s. Attempting fallback to local cache...",
@@ -75,7 +82,7 @@ async def fetch_tle_group(url: str) -> str:
                 cache_path.name,
                 text.strip().count("\n") // 3,
             )
-            return text
+            return text, "local_cache"
         else:
             logger.error("Local TLE cache not found at %s", cache_path)
             raise
@@ -136,21 +143,29 @@ def parse_tle_block(tle_text: str) -> list[tuple[str, Satrec]]:
 # ---------------------------------------------------------------------------
 
 
-async def fetch_and_parse(url: str = CELESTRAK_STARLINK_TLE) -> list[tuple[str, Satrec]]:
+async def fetch_and_parse(
+    url: str = CELESTRAK_STARLINK_TLE, return_source: bool = False
+):
     """Fetch raw TLE text and parse it in one step.
 
     Args:
         url: CelesTrak endpoint. Defaults to Starlink constellation.
+        return_source: when True, also return the data source so callers can
+            log honestly (``"network"`` / ``"local_cache"`` / ``"unavailable"``).
 
     Returns:
-        List of (name, Satrec) tuples.
+        List of ``(name, Satrec)`` tuples, or ``(satellites, source)`` when
+        ``return_source`` is True.
     """
     try:
-        tle_text = await fetch_tle_group(url)
-        return parse_tle_block(tle_text)
+        tle_text, source = await fetch_tle_group(url)
+        satellites = parse_tle_block(tle_text)
     except Exception as e:
         logger.error(f"Failed to fetch and parse TLEs: {e}")
-        return []
+        satellites, source = [], "unavailable"
+    if return_source:
+        return satellites, source
+    return satellites
 
 
 # ---------------------------------------------------------------------------

@@ -9,6 +9,13 @@ import {
   ManeuverBid
 } from '../types';
 
+export type ToastLevel = 'info' | 'error' | 'success';
+export interface ToastItem {
+  id: string;
+  message: string;
+  level: ToastLevel;
+}
+
 export interface SpaceState {
   satellites: Record<string, Satellite>;
   activeConjunctions: ConjunctionEvent[];
@@ -49,6 +56,10 @@ export interface SpaceState {
   resetForNewConjunction: () => void;
   activeTab: 'ground' | 'reflex';
   setActiveTab: (tab: 'ground' | 'reflex') => void;
+
+  toasts: ToastItem[];
+  addToast: (message: string, level?: ToastLevel) => void;
+  dismissToast: (id: string) => void;
 }
 
 export const useSpaceStore = create<SpaceState>((set) => ({
@@ -130,4 +141,15 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   }),
   activeTab: 'ground',
   setActiveTab: (tab) => set({ activeTab: tab }),
+
+  toasts: [],
+  addToast: (message, level = 'info') => set((state) => ({
+    toasts: [
+      ...state.toasts,
+      { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, message, level },
+    ],
+  })),
+  dismissToast: (id) => set((state) => ({
+    toasts: state.toasts.filter((t) => t.id !== id),
+  })),
 }));
