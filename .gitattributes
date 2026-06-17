@@ -1,3 +1,4 @@
 OrbitMind/*.pt filter=lfs diff=lfs merge=lfs -text
 OrbitMind/*.pth filter=lfs diff=lfs merge=lfs -text
 OrbitMind/*.mp4 filter=lfs diff=lfs merge=lfs -text
+OrbitMind/cache/*.json filter=lfs diff=lfs merge=lfs -text

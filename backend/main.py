@@ -37,6 +37,12 @@ import time as time_module
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
 
+# Configure logging before any local module is imported below — several of
+# them (e.g. backend.api.reflex) log at import time, and a logger with no
+# handler configured yet silently drops those records.
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # Simulation time warp
 # ---------------------------------------------------------------------------
@@ -69,9 +75,6 @@ from backend.api.reflex import router as reflex_router
 from backend.api.schemas import WSMessage, WSMessageType
 from backend.agents.graph import get_graph
 from backend.agents.nodes.tle_ingestion import _assign_operator
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 async def broadcast_satellite_positions():
     """Background task: propagate satellites every 2s and broadcast."""
