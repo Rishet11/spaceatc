@@ -165,9 +165,11 @@ async def drain_agent_ws_events():
             pass
         await asyncio.sleep(0.1)
 
+MAX_SATS = 200
+
 async def _ingest_sats(sats, source):
-    """Upsert the top 100 satellites into the DB + sat_cache for propagation."""
-    for name, satrec in sats[:100]:
+    """Upsert the top MAX_SATS satellites into the DB + sat_cache for propagation."""
+    for name, satrec in sats[:MAX_SATS]:
         nid = str(satrec.satnum)
         op = _assign_operator(name)
         sat_dict = {
