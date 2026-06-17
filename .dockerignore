@@ -15,7 +15,6 @@ backend_output.log
 backend/server.log
 deck/
 demo/
-.claude/
 .graphify/
 # OrbitMind: keep model weights + default video, drop training data
 OrbitMind/*.csv
