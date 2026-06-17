@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 
-export const TRAJECTORY_SOURCE: 'sim' | 'backend' = 'sim';
+// 'backend' = render the real SGP4-propagated conjunction paths fetched from
+// /api/conjunctions/{id}/paths. 'sim' = the local geometric great-circle arcs
+// (deriveVelocity + getPredictedPath), used as the offline/error fallback.
+export const TRAJECTORY_SOURCE: 'sim' | 'backend' = 'backend';
 
 export function deriveVelocity(points: THREE.Vector3[]): THREE.Vector3 | null {
   const n = points.length;

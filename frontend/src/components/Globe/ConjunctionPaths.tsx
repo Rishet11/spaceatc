@@ -1,4 +1,4 @@
-import React, { useRef, useReducer } from 'react';
+import React, { useRef, useReducer, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
@@ -9,6 +9,7 @@ import {
   getPredictedPath,
   bentPathParams,
   closestApproachIndex,
+  TRAJECTORY_SOURCE,
 } from './orbits';
 
 const ARC_DEG = 65;
@@ -19,6 +20,11 @@ const RED = '#ff4d4d';
 const AMBER = '#ffb347';
 const GREEN = '#22c55e';
 
+interface BackendArcs {
+  points: Record<string, THREE.Vector3[]>; // satellite name -> propagated path
+  tcaIndex: number;
+}
+
 export const ConjunctionPaths: React.FC = () => {
   const satellites = useSpaceStore((s) => s.satellites);
   const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
@@ -26,6 +32,7 @@ export const ConjunctionPaths: React.FC = () => {
 
   const bufRef = useRef<Map<string, THREE.Vector3[]>>(new Map());
   const [, force] = useReducer((x) => x + 1, 0);
+  const [backendArcs, setBackendArcs] = useState<BackendArcs | null>(null);
 
   const active = activeConjunctions.find(
     (c) =>
@@ -38,6 +45,36 @@ export const ConjunctionPaths: React.FC = () => {
     : active
       ? { satA: active.sat_primary, satB: active.sat_secondary }
       : null;
+
+  const eventId = active?.event_id ?? decisionOutcome?.eventId ?? null;
+
+  // Fetch the real SGP4-propagated paths for this conjunction. Falls back to
+  // the geometric arcs below if disabled, unavailable, or the request fails.
+  useEffect(() => {
+    if (TRAJECTORY_SOURCE !== 'backend' || !eventId) {
+      setBackendArcs(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/conjunctions/${eventId}/paths`);
+        if (!res.ok) throw new Error(`paths ${res.status}`);
+        const data = await res.json();
+        const toVecs = (pts: Array<{ lat: number; lon: number; alt_km: number }>) =>
+          pts.map((p) => geodeticToThreeJS(p.lat, p.lon, p.alt_km));
+        const points: Record<string, THREE.Vector3[]> = {};
+        if (data.primary?.name) points[data.primary.name] = toVecs(data.primary.points);
+        if (data.secondary?.name) points[data.secondary.name] = toVecs(data.secondary.points);
+        if (!cancelled) setBackendArcs({ points, tcaIndex: data.tca_index ?? 0 });
+      } catch {
+        if (!cancelled) setBackendArcs(null); // graceful fallback to geometric arcs
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
 
   const posOf = (name: string): THREE.Vector3 | null => {
     const s = Object.values(satellites).find((x) => x.name === name);
@@ -76,15 +113,30 @@ export const ConjunctionPaths: React.FC = () => {
   const posB = posOf(pair.satB);
   const velA = deriveVelocity(bufRef.current.get(pair.satA) ?? []);
   const velB = deriveVelocity(bufRef.current.get(pair.satB) ?? []);
-  if (!posA || !posB || !velA || !velB) return null; // hold off until motion is known
 
-  const arcA = getPredictedPath({ position: posA, velocity: velA, arcDeg: ARC_DEG, steps: STEPS });
-  const arcB = getPredictedPath({ position: posB, velocity: velB, arcDeg: ARC_DEG, steps: STEPS });
+  // Prefer the real backend-propagated arcs; otherwise fall back to the local
+  // geometric great-circle arcs (which need current position + derived velocity).
+  const beA = backendArcs?.points[pair.satA];
+  const beB = backendArcs?.points[pair.satB];
+  const usingBackend = !!(beA && beB && beA.length > 1 && beB.length > 1);
+
+  let arcA: THREE.Vector3[];
+  let arcB: THREE.Vector3[];
+  if (usingBackend) {
+    arcA = beA!;
+    arcB = beB!;
+  } else {
+    if (!posA || !posB || !velA || !velB) return null; // hold off until motion is known
+    arcA = getPredictedPath({ position: posA, velocity: velA, arcDeg: ARC_DEG, steps: STEPS });
+    arcB = getPredictedPath({ position: posB, velocity: velB, arcDeg: ARC_DEG, steps: STEPS });
+  }
   if (arcA.length === 0 || arcB.length === 0) return null;
 
   const approved = decisionOutcome?.decision === 'approve';
 
-  const ci = closestApproachIndex(arcA, arcB);
+  const ci = usingBackend
+    ? Math.min(backendArcs!.tcaIndex, arcA.length - 1, arcB.length - 1)
+    : closestApproachIndex(arcA, arcB);
   const markerPos = arcA[ci].clone().lerp(arcB[ci], 0.5);
 
   const maneuverName = decisionOutcome?.satelliteName;
@@ -100,16 +152,20 @@ export const ConjunctionPaths: React.FC = () => {
       decisionOutcome.burnDirection,
       decisionOutcome.deltaV
     );
+    // Seed the projected post-burn path from the maneuvering satellite's real
+    // motion, so the green divergence is anchored to its actual orbit.
     const mPos = aIsManeuver ? posA : posB;
     const mVel = aIsManeuver ? velA : velB;
-    safeArc = getPredictedPath({
-      position: mPos,
-      velocity: mVel,
-      arcDeg: ARC_DEG,
-      steps: STEPS,
-      phaseShiftDeg: phaseShiftDeg * ease,
-      radiusScale: 1 + (radiusScale - 1) * ease,
-    });
+    if (mPos && mVel) {
+      safeArc = getPredictedPath({
+        position: mPos,
+        velocity: mVel,
+        arcDeg: ARC_DEG,
+        steps: STEPS,
+        phaseShiftDeg: phaseShiftDeg * ease,
+        radiusScale: 1 + (radiusScale - 1) * ease,
+      });
+    }
     ghostArc = aIsManeuver ? arcA : bIsManeuver ? arcB : null;
   }
 
