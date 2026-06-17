@@ -18,12 +18,10 @@ if sys.platform == "darwin" and "DYLD_INSERT_LIBRARIES" not in os.environ:
     except Exception:
         pass
 
-# Mock out Ultralytics events/telemetry call to prevent background thread spawning (which causes segfaults in OpenMP on macOS)
-try:
-    import ultralytics.utils.events
-    ultralytics.utils.events.Events.__call__ = lambda *args, **kwargs: None
-except Exception:
-    pass
+# Ultralytics telemetry is silenced lazily in backend.api.reflex.lazy_load_models
+# so this module does not import ultralytics (and pull the whole ML stack) at
+# startup. Keeping startup light lets the server bind its port within seconds,
+# which is what the deploy platform needs to promote a new build.
 
 # Limit OpenMP, PyTorch and OpenCV threads to 1 to prevent system mutex overflows on macOS CPU
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -42,7 +40,7 @@ from contextlib import asynccontextmanager
 # ---------------------------------------------------------------------------
 # Simulation time warp
 # ---------------------------------------------------------------------------
-SIM_SPEED: float = 60.0        # default: 60× (1 real sec = 1 orbital minute)
+SIM_SPEED: float = 1.0         # default: real-time, so SIM TIME tracks real UTC (no drift); judges can fast-forward via the speed selector
 SIM_START_REAL: float = 0.0    # set on startup
 SIM_START_UTC: datetime = datetime.utcnow()  # set on startup
 
@@ -164,76 +162,67 @@ async def drain_agent_ws_events():
             pass
         await asyncio.sleep(0.1)
 
+async def _ingest_sats(sats, source):
+    """Upsert the top 100 satellites into the DB + sat_cache for propagation."""
+    for name, satrec in sats[:100]:
+        nid = str(satrec.satnum)
+        op = _assign_operator(name)
+        sat_dict = {
+            "norad_id": nid,
+            "name": name,
+            "operator": op,
+            "fuel_units": 100.0,
+            "maneuver_count": 0,
+            "omm_json": "{}",
+        }
+        await upsert_satellite(sat_dict)
+        sat_cache[nid] = {"satrec": satrec, "name": name, "operator": op}
+    logger.info(
+        "TLE load complete: source=%s parsed=%d sat_cache=%d",
+        source, len(sats), len(sat_cache),
+    )
+
+
+async def _load_satellites():
+    """Populate the globe without blocking startup. Load the bundled cache first
+    (fast, offline) so the globe is never empty, then attempt a live CelesTrak
+    refresh (a no-op on egress-restricted hosts like the Space)."""
+    from pathlib import Path
+    from backend.orbital.tle_client import parse_tle_block
+    cache_path = Path(__file__).parent / "orbital" / "starlink_cache.tle"
+    try:
+        if cache_path.exists():
+            await _ingest_sats(parse_tle_block(cache_path.read_text(encoding="utf-8")), "local_cache")
+    except Exception as e:
+        logger.error("Bundled TLE cache load failed: %s", e, exc_info=True)
+    try:
+        sats, source = await fetch_and_parse(CELESTRAK_STARLINK_TLE, return_source=True)
+        if sats and source == "network":
+            await _ingest_sats(sats, "network")
+    except Exception as e:
+        logger.info("Live TLE refresh unavailable (%s); staying on bundled cache.", type(e).__name__)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global SIM_START_REAL, SIM_START_UTC
     SIM_START_REAL = time_module.time()
     SIM_START_UTC = datetime.utcnow()
 
-    # 1. init_db()
     logger.info("Initializing DB...")
     await init_db()
-    
-    # 2. fetch TLEs and store top 100 satellites
-    logger.info("Fetching TLEs...")
-    try:
-        sats, source = await fetch_and_parse(CELESTRAK_STARLINK_TLE, return_source=True)
 
-        # Guarantee a non-empty globe: if the network fetch yielded nothing
-        # (blocked host, empty 200 response, parse failure), fall back to the
-        # bundled local cache rather than starting with zero satellites.
-        if not sats:
-            from pathlib import Path
-            from backend.orbital.tle_client import parse_tle_block
-            cache_path = Path(__file__).parent / "orbital" / "starlink_cache.tle"
-            if cache_path.exists():
-                sats = parse_tle_block(cache_path.read_text(encoding="utf-8"))
-                source = "local_cache"
-                logger.warning(
-                    "TLE network fetch returned no satellites; loaded %d from local cache (%s)",
-                    len(sats), cache_path.name,
-                )
-            else:
-                logger.error("TLE network fetch empty and local cache missing at %s", cache_path)
-
-        top_100 = sats[:100]
-        for name, satrec in top_100:
-            nid = str(satrec.satnum)
-            op = _assign_operator(name)
-            
-            # Simple fake TLE lines for MVP reconstruction 
-            # (since we didn't fetch raw lines, we can just use the satrec to build a dict)
-            # However, for propagation, we just cache the satrec directly!
-            
-            sat_dict = {
-                "norad_id": nid,
-                "name": name,
-                "operator": op,
-                "fuel_units": 100.0,
-                "maneuver_count": 0,
-                "omm_json": "{}"
-            }
-            await upsert_satellite(sat_dict)
-            sat_cache[nid] = {
-                "satrec": satrec,
-                "name": name,
-                "operator": op,
-            }
-            
-        logger.info(
-            "TLE load complete: source=%s parsed=%d sat_cache=%d",
-            source, len(sats), len(sat_cache),
-        )
-    except Exception as e:
-        logger.error(f"Failed to fetch TLEs: {e}", exc_info=True)
-        
-    # 3. start background tasks
+    # Load satellites in the background so the server binds its port within
+    # seconds. The ML import is already deferred; this removes the last blocking
+    # startup step (a network fetch that times out on egress-restricted hosts),
+    # which is what kept the platform from promoting a new build.
+    task0 = asyncio.create_task(_load_satellites())
     task1 = asyncio.create_task(broadcast_satellite_positions())
     task2 = asyncio.create_task(drain_agent_ws_events())
-    
+
     yield
-    
-    # cleanup
+
+    task0.cancel()
     task1.cancel()
     task2.cancel()
 

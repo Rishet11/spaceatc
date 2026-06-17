@@ -14,10 +14,10 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import cv2
 import numpy as np
-import torch
-import torch.nn as nn
-from torchvision import models, transforms
-from ultralytics import YOLO
+# torch / torchvision / ultralytics are imported lazily (inside lazy_load_models
+# and the inference helpers) so importing this module does not pull the whole ML
+# stack at app startup. That import costs ~30s and was making the deployed
+# container slow to bind its port, so the platform never promoted the new build.
 
 from backend.api.reflex_playbook import (
     classify_threat,
@@ -69,60 +69,89 @@ K = None
 DIST_COEFFS = None
 KP3D = None
 
-class KeypointMobileNet(nn.Module):
-    def __init__(self, num_coords=22):
-        super().__init__()
-        base = models.mobilenet_v3_small(weights=None)
-        feat_dim = base.classifier[0].in_features
-        base.classifier = nn.Identity()
-        self.backbone = base
-        self.head = nn.Sequential(
-            nn.Linear(feat_dim, 256),
-            nn.Hardswish(),
-            nn.Dropout(0.3),
-            nn.Linear(256, 128),
-            nn.Hardswish(),
-            nn.Dropout(0.2),
-            nn.Linear(128, num_coords),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        return self.head(self.backbone(x))
-
 _MEAN = [0.485, 0.456, 0.406]
 _STD  = [0.229, 0.224, 0.225]
-TRANSFORM = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.Resize((CFG["crop_size"], CFG["crop_size"])),
-    transforms.ToTensor(),
-    transforms.Normalize(_MEAN, _STD)
-])
+_TRANSFORM = None  # built lazily on first model load (torchvision import deferred)
+
+
+def _build_transform():
+    from torchvision import transforms
+    return transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.Resize((CFG["crop_size"], CFG["crop_size"])),
+        transforms.ToTensor(),
+        transforms.Normalize(_MEAN, _STD),
+    ])
+
+
+def _build_kpt_model(num_coords):
+    """Define + instantiate the keypoint model. torch/torchvision are imported
+    here so module import (and app startup) does not pay their cost."""
+    import torch.nn as nn
+    from torchvision import models
+
+    class KeypointMobileNet(nn.Module):
+        def __init__(self, num_coords=22):
+            super().__init__()
+            base = models.mobilenet_v3_small(weights=None)
+            feat_dim = base.classifier[0].in_features
+            base.classifier = nn.Identity()
+            self.backbone = base
+            self.head = nn.Sequential(
+                nn.Linear(feat_dim, 256),
+                nn.Hardswish(),
+                nn.Dropout(0.3),
+                nn.Linear(256, 128),
+                nn.Hardswish(),
+                nn.Dropout(0.2),
+                nn.Linear(128, num_coords),
+                nn.Sigmoid(),
+            )
+
+        def forward(self, x):
+            return self.head(self.backbone(x))
+
+    return KeypointMobileNet(num_coords)
 
 def lazy_load_models():
-    global YOLO_MODEL, KPT_MODEL, K, DIST_COEFFS, KP3D
+    global YOLO_MODEL, KPT_MODEL, K, DIST_COEFFS, KP3D, _TRANSFORM
+    import torch
+    from ultralytics import YOLO
+    # Silence ultralytics telemetry here (deferred import). Its background
+    # thread can segfault under OpenMP on macOS.
+    try:
+        import ultralytics.utils.events as _uevents
+        _uevents.Events.__call__ = lambda *a, **k: None
+    except Exception:
+        pass
+
     device = CFG["device"]
-    
+
+    if _TRANSFORM is None:
+        _TRANSFORM = _build_transform()
+
     if YOLO_MODEL is None:
         logger.info("Lazy loading YOLO26 model for Reflex API...")
         YOLO_MODEL = YOLO(YOLO_WEIGHTS)
-        
+
     if KPT_MODEL is None:
         logger.info("Lazy loading KeypointMobileNet model for Reflex API...")
         ckpt = torch.load(KPT_WEIGHTS, map_location=device, weights_only=False)
-        KPT_MODEL = KeypointMobileNet(NUM_COORDS)
+        KPT_MODEL = _build_kpt_model(NUM_COORDS)
         state_dict = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
         KPT_MODEL.load_state_dict(state_dict)
         KPT_MODEL.to(device)
         KPT_MODEL.eval()
-        
+
     if K is None:
         if os.path.exists(CAMERA_JSON):
             with open(CAMERA_JSON) as f:
                 cam = json.load(f)
             K = np.array(cam["cameraMatrix"], dtype=np.float32)
             DIST_COEFFS = np.array(cam["distCoeffs"], dtype=np.float32).ravel()
+            logger.info("Loaded camera intrinsics from %s (metric range enabled)", os.path.basename(CAMERA_JSON))
         else:
+            logger.warning("camera.json missing; using synthetic intrinsics (range is relative, not metric)")
             K = np.array([[1000, 0, 960], [0, 1000, 600], [0, 0, 1]], dtype=np.float32)
             DIST_COEFFS = np.zeros(5, dtype=np.float32)
 
@@ -131,6 +160,7 @@ def lazy_load_models():
             from scipy.io import loadmat
             KP3D = np.ascontiguousarray(loadmat(TANGO_MAT)["tango3Dpoints"].T).astype(np.float32)
         else:
+            logger.warning("tangoPoints.mat missing; using generic keypoint cube")
             KP3D = FALLBACK_KP3D
 
 def rotation_matrix_to_quaternion(R):
@@ -289,6 +319,7 @@ def _infer_frame_blocking(frame_idx: int, mode: str | None) -> dict:
     Returns everything except the LLM decision narrative, which the async caller
     adds. Range is swept (not measured) when mode == 'replay'.
     """
+    import torch  # deferred ML import (already resident after lazy_load_models)
     with _INFER_LOCK:
         cap = _open_capture(CURRENT_VIDEO_PATH)
         if not cap.isOpened():
@@ -334,7 +365,7 @@ def _infer_frame_blocking(frame_idx: int, mode: str | None) -> dict:
                 continue
 
             # Keypoint prediction
-            inp = TRANSFORM(crop).unsqueeze(0).to(CFG["device"])
+            inp = _TRANSFORM(crop).unsqueeze(0).to(CFG["device"])
             with torch.no_grad():
                 pred = KPT_MODEL(inp)[0].cpu().numpy()
 
