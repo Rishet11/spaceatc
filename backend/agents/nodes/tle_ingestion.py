@@ -94,7 +94,7 @@ async def ingest_tle(state: AgentState) -> dict:
         "unavailable": "no source available",
     }.get(source, source)
     msg = f"[TLE INGESTION] Loaded {len(processed_sats)} active satellites from {source_label}"
-    msg2 = "[TLE INGESTION] Coverage: SpaceX Starlink, OneWeb, active payloads"
+    msg2 = "[TLE INGESTION] Coverage: SpaceX Starlink constellation (low-Earth orbit)"
     new_messages = [msg, msg2]
 
     # 4. Queue system_status WS event (include messages so frontend can log them)

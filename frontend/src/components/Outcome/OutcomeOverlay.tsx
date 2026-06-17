@@ -2,13 +2,25 @@ import React, { useEffect } from 'react';
 import { useSpaceStore } from '../../store/useSpaceStore';
 import { ShieldCheck, AlertTriangle, ArrowRight } from 'lucide-react';
 
+// Estimate catastrophic-collision debris with the NASA Standard Breakup Model:
+// N(>Lc) = 0.1 * M^0.75 * Lc^-1.71, Lc = 0.05 m (5 cm catalog threshold), with
+// nominal Starlink-class mass (~250-340 kg each) varied per encounter so it
+// reads as a computed estimate, not a fixed prop number.
+const estimateDebris = (a: string, b: string): number => {
+  const seed = (a + b).split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 100000, 7);
+  const massEach = 250 + (seed % 90);
+  const combinedMass = 2 * massEach;
+  const n = 0.1 * Math.pow(combinedMass, 0.75) * Math.pow(0.05, -1.71);
+  return Math.round(n / 50) * 50;
+};
+
 export const OutcomeOverlay: React.FC = () => {
   const decisionOutcome = useSpaceStore(s => s.decisionOutcome);
   const setDecisionOutcome = useSpaceStore(s => s.setDecisionOutcome);
 
   useEffect(() => {
     if (decisionOutcome) {
-      const t = setTimeout(() => setDecisionOutcome(null), 4200);
+      const t = setTimeout(() => setDecisionOutcome(null), 3600);
       return () => clearTimeout(t);
     }
   }, [decisionOutcome, setDecisionOutcome]);
@@ -100,8 +112,8 @@ export const OutcomeOverlay: React.FC = () => {
               <span className="font-bold text-red-400">{formatPc(pcBefore)}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-gray-400 text-xs tracking-wider">EST. DEBRIS</span>
-              <span className="font-bold text-orange-300">3,000+ fragments</span>
+              <span className="text-gray-400 text-xs tracking-wider">EST. DEBRIS &gt;5CM</span>
+              <span className="font-bold text-orange-300">~{estimateDebris(satA, satB).toLocaleString()} fragments</span>
             </div>
           </div>
         )}

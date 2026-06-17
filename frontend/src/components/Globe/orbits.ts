@@ -59,10 +59,13 @@ export function bentPathParams(
   burnDirection: 'prograde' | 'retrograde' | 'radial',
   deltaV_ms: number
 ): { phaseShiftDeg: number; radiusScale: number } {
-  const mag = Math.min(18, Math.max(7, deltaV_ms * 60)); // degrees of along-track shift
+  // Subtle along-track shift: legible separation without a theatrical orbit
+  // swing. The real signal that the maneuver worked is the collision-probability
+  // drop shown in the HITL panel and outcome readout, not a big visual jump.
+  const mag = Math.min(5, Math.max(2, deltaV_ms * 18)); // degrees of along-track shift
   if (burnDirection === 'prograde') return { phaseShiftDeg: mag, radiusScale: 1 };
   if (burnDirection === 'retrograde') return { phaseShiftDeg: -mag, radiusScale: 1 };
-  return { phaseShiftDeg: 0, radiusScale: 1.06 }; // radial: raise to a higher shell
+  return { phaseShiftDeg: 0, radiusScale: 1.02 }; // radial: nudge to a slightly higher shell
 }
 
 export function closestApproachIndex(a: THREE.Vector3[], b: THREE.Vector3[]): number {

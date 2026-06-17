@@ -131,7 +131,7 @@ const ExplosionParticle: React.FC<{ data: ExplosionData }> = ({ data }) => {
 
   useFrame(({ clock }) => {
     const elapsed = clock.elapsedTime - data.startTime;
-    const duration = 3.5;
+    const duration = 2.6;
     const k = Math.min(elapsed / duration, 1);
 
     // Core flash — fast bloom, then fade.

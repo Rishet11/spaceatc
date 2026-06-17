@@ -30,12 +30,12 @@
 
 @keyframes outcome-flash {
   0% { opacity: 0; }
-  12% { opacity: 0.45; }
+  18% { opacity: 0.16; }
   100% { opacity: 0; }
 }
 
 .animate-outcome-flash {
-  animation: outcome-flash 0.9s ease-out forwards;
+  animation: outcome-flash 0.45s ease-out forwards;
 }
 
 @keyframes outcome-pop {
@@ -47,7 +47,7 @@
 }
 
 .animate-outcome-pop {
-  animation: outcome-pop 4.2s ease-out forwards;
+  animation: outcome-pop 3.6s ease-out forwards;
 }
 
 @keyframes screen-shake {
