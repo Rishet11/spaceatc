@@ -88,5 +88,4 @@ OrbitMind/uploads/
 backend_output.log
 backend/server.log
 frontend/ts_errors.log
-.claude/
 .graphify/
