@@ -65,9 +65,11 @@ async def generate_operator_bid(state: AgentState) -> dict:
             logger.error("compute_minimum_delta_v failed for event %s: %s", current_event_id, e)
             return {"phase": "resolved"}
 
-        # Slightly increase second satellite's effective delta-V for demo variety
-        # (in real life they would get different results due to orbital geometry)
-        dv = m_out.delta_v_ms * (1.0 + (0.1 * i))
+        # Real per-satellite delta-V: each operator's CW computation uses its
+        # own satellite's mean motion (derived from that satellite's TLE), so
+        # the two bids differ on genuine orbital geometry rather than an
+        # artificial offset.
+        dv = m_out.delta_v_ms
 
         # 3. Compute bid_score = delta_v_ms + (maneuver_count * 0.1)
         maneuver_count = maneuvering_sat.get("maneuver_count", 0)

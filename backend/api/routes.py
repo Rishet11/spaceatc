@@ -209,18 +209,22 @@ def generate_conjunction_tle_pair(epoch_dt: datetime) -> tuple[tuple[str, str, s
     ecc = "0001000"
     argp = 0.0
     ma_a = 0.0
+    # Same orbital shell for both satellites: two co-orbital craft need an
+    # essentially symmetric avoidance delta-V (real physics). The negotiation
+    # winner is therefore decided by operational cost (maneuver history / fuel),
+    # not by an artificial delta-V difference. See demo_inject / tle_ingestion.
     mm = "15.30000000"
-    
+
     def format_angle(deg):
         return f"{deg:8.4f}".rjust(8, ' ')
-        
+
     line1_a = f"1 99001U 24001A   {epoch_str}  .00000000  00000-0  00000-0 0  9999"
     line2_a = f"2 99001  {inc} {format_angle(raan_a)} {ecc} {format_angle(argp)} {format_angle(ma_a)} {mm}    00"
-    
+
     raan_b = raan_a + 0.01
     ma_b = ma_a - 0.005
     if ma_b < 0: ma_b += 360.0
-    
+
     line1_b = f"1 99002U 24001B   {epoch_str}  .00000000  00000-0  00000-0 0  9999"
     line2_b = f"2 99002  {inc} {format_angle(raan_b)} {ecc} {format_angle(argp)} {format_angle(ma_b)} {mm}    00"
     
@@ -239,6 +243,10 @@ async def demo_inject():
     (name_a, line1_a, line2_a), (name_b, line1_b, line2_b) = generate_conjunction_tle_pair(dt)
 
     # 2. Upsert to DB
+    # The two demo craft are co-orbital, so their avoidance delta-V is
+    # symmetric. They differ in operational history instead: DEMO-SAT-B has
+    # already spent fuel on prior maneuvers, so the coordinator prefers
+    # DEMO-SAT-A to take this burn (load-balancing on a real attribute).
     demo_a = {
         "norad_id": "99001",
         "name": name_a,
@@ -251,8 +259,8 @@ async def demo_inject():
         "norad_id": "99002",
         "name": name_b,
         "operator": "Demo_B",
-        "fuel_units": 100.0,
-        "maneuver_count": 0,
+        "fuel_units": 96.0,
+        "maneuver_count": 2,
         "omm_json": json.dumps({"line1": line1_b, "line2": line2_b})
     }
     

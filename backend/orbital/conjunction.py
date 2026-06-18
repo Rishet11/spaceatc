@@ -356,10 +356,18 @@ def compute_minimum_delta_v(input: ManeuverInput) -> ManeuverOutput:  # noqa: A0
     tau = input.burn_lead_time_minutes * 60.0  # seconds
 
     # ------------------------------------------------------------------
-    # LEO orbital parameters (~550 km altitude)
+    # Mean motion of the maneuvering satellite's reference orbit.
+    # Taken directly from its TLE: sgp4 stores mean motion as
+    # ``no_kozai`` in radians/minute.  Falls back to a ~550 km LEO
+    # period only if the satrec is missing the field.
     # ------------------------------------------------------------------
-    T_orbit = 5730.0            # orbital period in seconds
-    n = 2 * np.pi / T_orbit     # mean motion in rad/s
+    no_kozai = getattr(sat_maneuvering, "no_kozai", None)  # rad/min (from TLE)
+    if no_kozai and no_kozai > 0:
+        n = no_kozai / 60.0          # rad/s
+        T_orbit = 2 * np.pi / n      # seconds (reference / trace only)
+    else:
+        T_orbit = 5730.0             # fallback: ~550 km LEO period (s)
+        n = 2 * np.pi / T_orbit      # mean motion in rad/s
 
     # ------------------------------------------------------------------
     # Original miss distance at TCA
