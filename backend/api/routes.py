@@ -5,7 +5,7 @@ backend/api/routes.py — REST API routes (PRD Section 7).
 import uuid
 import json
 import time as time_module
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -19,6 +19,7 @@ from backend.db.store import (
 )
 from backend.agents.graph import run_pipeline, resume_after_hitl
 from backend.api.schemas import MetricsResponse
+from backend.orbital.propagator import propagate_at, eci_to_geodetic
 from sgp4.api import Satrec
 
 router = APIRouter()
@@ -115,6 +116,71 @@ async def get_single_conjunction(event_id: str):
     if not ev:
         raise HTTPException(status_code=404, detail="Not found")
     return ev
+
+@router.get("/api/conjunctions/{event_id}/paths")
+async def get_conjunction_paths(event_id: str):
+    """Real SGP4-propagated ground tracks for the two satellites in a conjunction.
+
+    Samples each satellite's actual position across a window centred on the
+    predicted TCA so the frontend can render the true orbital paths instead of
+    geometric great-circle arcs. Returns ~120 lat/lon/alt points per satellite.
+    """
+    ev = await get_conjunction(event_id)
+    if not ev:
+        raise HTTPException(status_code=404, detail="Conjunction not found")
+
+    try:
+        tca = datetime.fromisoformat(ev["tca"])
+    except (KeyError, ValueError):
+        raise HTTPException(status_code=400, detail="Conjunction has no valid TCA")
+    if tca.tzinfo is None:
+        tca = tca.replace(tzinfo=timezone.utc)
+
+    # Resolve satrecs by name from the shared cache (populated for every
+    # cached satellite by the main.py background task and demo injection).
+    def _find_satrec(name):
+        for data in sat_cache.values():
+            if data.get("name") == name:
+                return data.get("satrec")
+        return None
+
+    name_primary = ev["sat_primary"]
+    name_secondary = ev["sat_secondary"]
+    satrec_primary = _find_satrec(name_primary)
+    satrec_secondary = _find_satrec(name_secondary)
+    if satrec_primary is None or satrec_secondary is None:
+        raise HTTPException(status_code=404, detail="Satellite propagation data unavailable")
+
+    window_s = 30 * 60   # +/- 30 minutes around TCA
+    step_s = 30          # 30 s cadence -> ~120 points
+    offsets = range(-window_s, window_s + 1, step_s)
+
+    def _track(satrec):
+        pts = []
+        tca_index = 0
+        for off in offsets:
+            t = tca + timedelta(seconds=off)
+            pos, _ = propagate_at(satrec, t)
+            if pos is None:
+                continue
+            lat, lon, alt = eci_to_geodetic(pos, t)
+            if off <= 0:
+                tca_index = len(pts)  # last sample at or before TCA
+            pts.append({"lat": lat, "lon": lon, "alt_km": alt})
+        return pts, tca_index
+
+    primary_pts, tca_index = _track(satrec_primary)
+    secondary_pts, _ = _track(satrec_secondary)
+    if not primary_pts or not secondary_pts:
+        raise HTTPException(status_code=404, detail="Propagation produced no points")
+
+    return {
+        "event_id": event_id,
+        "tca": tca.isoformat(),
+        "tca_index": tca_index,
+        "primary": {"name": name_primary, "points": primary_pts},
+        "secondary": {"name": name_secondary, "points": secondary_pts},
+    }
 
 @router.get("/api/metrics")
 async def get_metrics():
