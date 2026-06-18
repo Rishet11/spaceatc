@@ -7,9 +7,7 @@ Public API:
   ManeuverInput      — dataclass (PRD §11)
   ManeuverOutput     — dataclass (PRD §11)
 
-  compute_pc_simplified(miss_distance_km, relative_velocity_km_s) -> float
   find_tca(input: ConjunctionInput) -> ConjunctionOutput
-  screen_pairs(satellites, t_start, t_end) -> list[dict]
   compute_minimum_delta_v(input: ManeuverInput) -> ManeuverOutput
 
 PRD references: Section 8.3, Section 11
@@ -98,51 +96,6 @@ def _propagate(satrec, dt: datetime):
     if e != 0:
         return None, None
     return np.array(r), np.array(v)
-
-
-# ---------------------------------------------------------------------------
-# Pc helper 
-# ---------------------------------------------------------------------------
-
-
-def compute_pc_simplified(
-    miss_distance_km: float,
-    relative_velocity_km_s: float,
-    combined_radius_km: float = 0.01,
-) -> float:
-    """Simplified Pc calculation for demo purposes.
-
-    Uses a 2-D Gaussian peak-density approximation.  Real Pc requires
-    covariance matrices (Akella-Alfriend 2000 / Foster 1992), which are
-    not available from TLE alone.  For the demo we use a conservative
-    position uncertainty of 1 km (typical TLE accuracy).
-
-    The formula treats the encounter as a random miss vector drawn from a
-    2-D isotropic Gaussian with standard deviation *sigma* in each
-    encounter-plane direction.  The collision probability is the Gaussian
-    density at the miss distance times the hard-body cross-section area:
-
-        Pc = (π · r_combined² / σ²) · exp(−d² / 2σ²)
-
-    Args:
-        miss_distance_km:       Scalar miss distance at TCA (km).
-        relative_velocity_km_s: Relative speed at TCA (km/s).  Not used in
-                                 this simplified model but kept in the
-                                 signature for API compatibility.
-        combined_radius_km:     Sum of the hard-body radii of the two objects
-                                 (default 0.01 km = 10 m).
-
-    Returns:
-        Collision probability as a float clamped to [0, 1].
-    """
-    sigma = 1.0  # km — TLE position uncertainty (conservative)
-    # 2-D Gaussian encounter probability 
-    pc = (
-        math.exp(-0.5 * (miss_distance_km / sigma) ** 2)
-        * (combined_radius_km / sigma) ** 2
-        * math.pi
-    )
-    return min(max(pc, 0.0), 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -251,62 +204,6 @@ def find_tca(input: ConjunctionInput) -> ConjunctionOutput:  # noqa: A002
         pc=pc,
         relative_velocity_km_s=rel_v,
     )
-
-
-# ---------------------------------------------------------------------------
-# screen_pairs — used by conjunction_detector.py
-# ---------------------------------------------------------------------------
-
-
-def screen_pairs(
-    satellites: list,
-    t_start: datetime,
-    t_end: datetime,
-) -> list:
-    """Screen satellite pairs for conjunctions above the Pc threshold.
-
-    Args:
-        satellites: List of (name, operator, satrec) tuples.
-        t_start:    Screening window start (UTC).
-        t_end:      Screening window end (UTC).
-
-    Returns:
-        List of dicts (one per flagged conjunction) with keys:
-        sat_primary, sat_secondary, tca, miss_distance_km, pc,
-        relative_velocity_km_s.
-
-    Only pairs from **different** operators are screened.  A quick
-    mid-window pre-filter (500 km threshold) is applied first to
-    avoid expensive full-window scans on widely separated pairs.
-    """
-    results: list[dict] = []
-    for i in range(len(satellites)):
-        for j in range(i + 1, len(satellites)):
-            name_i, op_i, sat_i = satellites[i]
-            name_j, op_j, sat_j = satellites[j]
-            if op_i == op_j:
-                continue  # skip same-operator pairs
-
-            # Quick prefilter at midpoint to save compute
-            t_mid = t_start + (t_end - t_start) / 2
-            r1, _ = _propagate(sat_i, t_mid)
-            r2, _ = _propagate(sat_j, t_mid)
-            if r1 is None or r2 is None:
-                continue
-            if np.linalg.norm(r1 - r2) > 500:  # coarse filter (km)
-                continue
-
-            out = find_tca(ConjunctionInput(sat_i, sat_j, t_start, t_end))
-            if out.pc > PC_ALERT_THRESHOLD:
-                results.append({
-                    'sat_primary': name_i,
-                    'sat_secondary': name_j,
-                    'tca': out.tca,
-                    'miss_distance_km': out.miss_distance_km,
-                    'pc': out.pc,
-                    'relative_velocity_km_s': out.relative_velocity_km_s,
-                })
-    return results
 
 
 # ---------------------------------------------------------------------------

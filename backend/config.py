@@ -36,9 +36,6 @@ class Settings(BaseSettings):
     websocket_ping_interval: int = 5       # seconds
     tle_refresh_interval: int = 3600       # seconds
 
-    # --- Demo mode ---
-    demo_mode: bool = True
-
     # --- Conjunction screening thresholds ---
     screening_distance_km: float = 5.0
     pc_alert_threshold: float = 1e-4
