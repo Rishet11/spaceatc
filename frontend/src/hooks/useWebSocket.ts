@@ -5,6 +5,7 @@ import { WSMessage } from '../types';
 export const useWebSocket = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warnedDisconnectRef = useRef<boolean>(false);
   const {
     updateSatellites,
     addFeedEvent,
@@ -18,6 +19,7 @@ export const useWebSocket = () => {
     setResolvedEvent,
     setNegotiationBids,
     resetForNewConjunction,
+    addToast,
   } = useSpaceStore();
 
   useEffect(() => {
@@ -34,10 +36,19 @@ export const useWebSocket = () => {
       ws.onopen = () => {
         console.log('WebSocket connected');
         backoff = 1000; // Reset backoff on successful connect
+        if (warnedDisconnectRef.current) {
+          addToast('Live connection restored.', 'success');
+          warnedDisconnectRef.current = false;
+        }
       };
-      
+
       ws.onclose = () => {
         console.log(`WebSocket disconnected, reconnecting in ${backoff}ms...`);
+        // Warn once per disconnect episode so reconnect attempts don't spam toasts.
+        if (!warnedDisconnectRef.current) {
+          addToast('Live connection lost — reconnecting…', 'error');
+          warnedDisconnectRef.current = true;
+        }
         timeoutRef.current = setTimeout(connectWs, backoff);
         backoff = Math.min(backoff * 1.5, 5000); // Max 5s backoff
       };
