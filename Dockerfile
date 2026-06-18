@@ -31,6 +31,11 @@ COPY backend/ ./backend/
 COPY OrbitMind/ ./OrbitMind/
 COPY --from=frontend /fe/dist ./frontend/dist
 
+# Smoke-check the YOLO26 weights load with the installed ultralytics. Non-fatal:
+# logs a clear warning if the weights are an unresolved LFS pointer or the wheel
+# is too old, instead of silently breaking OrbitMind inference at runtime.
+RUN python OrbitMind/check_model.py || true
+
 # Grant write permissions to the OrbitMind folder so the non-root HF user can save video uploads
 RUN mkdir -p ./OrbitMind/uploads && chmod -R 777 ./OrbitMind
 

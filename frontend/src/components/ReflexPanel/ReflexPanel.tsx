@@ -68,7 +68,17 @@ export const ReflexPanel: React.FC = () => {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/reflex/frame/${idx}`);
-      if (!res.ok) throw new Error(`Failed to fetch frame ${idx}`);
+      if (!res.ok) {
+        // Surface the backend's human-readable reason (e.g. 503 when the YOLO26
+        // weights or video are unavailable on the deployment) instead of a
+        // generic message.
+        let detail = `Failed to fetch frame ${idx}`;
+        try {
+          const body = await res.json();
+          if (body?.detail) detail = body.detail;
+        } catch { /* non-JSON error body */ }
+        throw new Error(detail);
+      }
       const data: FrameData = await res.json();
       if (seq !== fetchSeqRef.current) return; // a newer request superseded this one
       setFrameData(data);
@@ -249,7 +259,7 @@ export const ReflexPanel: React.FC = () => {
           <div>
             <h2 className="text-base font-mono font-bold text-white">OrbitMind — Onboard Debris Detection &amp; Evasion</h2>
             <p className="text-xs font-mono text-gray-400 mt-1">
-              YOLOv8 object detection + MobileNetV3 6-DOF pose estimation on satellite camera footage. Evasion fires when debris closes within 1.5 m.
+              YOLO26 object detection + MobileNetV3 6-DOF pose estimation on satellite camera footage. Evasion fires when debris closes within 1.5 m.
             </p>
           </div>
           <div className="flex items-center space-x-4 text-[10px] font-mono text-gray-500">
@@ -399,7 +409,7 @@ export const ReflexPanel: React.FC = () => {
           <div className="flex items-center space-x-2 border-b border-white/10 pb-3 mb-4">
             <Video className="w-5 h-5 text-emerald-400" />
             <h3 className="text-sm font-mono tracking-widest font-bold text-emerald-400 uppercase">
-              Sensor Feed Ingestion (YOLOv8 + 6DOF PIPELINE)
+              Sensor Feed Ingestion (YOLO26 + 6DOF PIPELINE)
             </h3>
           </div>
           

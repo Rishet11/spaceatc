@@ -177,8 +177,7 @@ async def lifespan(app: FastAPI):
     # 2. fetch TLEs and store top 100 satellites
     logger.info("Fetching TLEs...")
     try:
-        sats = await fetch_and_parse(CELESTRAK_STARLINK_TLE)
-        source = "network"
+        sats, source = await fetch_and_parse(CELESTRAK_STARLINK_TLE, return_source=True)
 
         # Guarantee a non-empty globe: if the network fetch yielded nothing
         # (blocked host, empty 200 response, parse failure), fall back to the

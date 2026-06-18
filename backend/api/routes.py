@@ -4,6 +4,7 @@ backend/api/routes.py — REST API routes (PRD Section 7).
 
 import uuid
 import json
+import logging
 import time as time_module
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException
@@ -23,6 +24,7 @@ from backend.orbital.propagator import propagate_at, eci_to_geodetic
 from sgp4.api import Satrec
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # In-memory cache of Satrec objects populated by main.py background task
 # so GET /api/satellites can return propagated positions.
@@ -339,18 +341,33 @@ async def demo_inject():
     sat_cache["99001"] = {"satrec": satrec_a, "name": name_a, "operator": demo_a["operator"]}
     sat_cache["99002"] = {"satrec": satrec_b, "name": name_b, "operator": demo_b["operator"]}
     
-    # 3. Run full pipeline
+    # 3. Run full pipeline (wrapped: a pipeline exception must surface as a clean
+    # error response, not an unhandled 500 the frontend silently swallows).
     global latest_session_id
     latest_session_id = str(uuid.uuid4())
-    state = await run_pipeline(latest_session_id)
-    
+    try:
+        state = await run_pipeline(latest_session_id)
+    except Exception as e:
+        logger.error("demo_inject pipeline failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Conjunction pipeline failed: {e}")
+
     # Find the injected event (the one with DEMO-SAT-A)
     event_id = None
     for ev in state.get("active_conjunctions", []):
         if "DEMO-SAT" in ev["sat_primary"] or "DEMO-SAT" in ev["sat_secondary"]:
             event_id = ev["event_id"]
             break
-            
+
+    if event_id is None:
+        # Pipeline completed but produced no conjunction (e.g. screening found no
+        # close approach). Report it honestly instead of a misleading "injected".
+        logger.warning("demo_inject completed but no conjunction was detected")
+        return {
+            "status": "no_conjunction",
+            "event_id": None,
+            "detail": "Pipeline ran but no conjunction was detected.",
+        }
+
     return {"status": "injected", "event_id": event_id, "expected_tca_seconds": 120}
 
 @router.post("/api/hitl/{event_id}/approve")
