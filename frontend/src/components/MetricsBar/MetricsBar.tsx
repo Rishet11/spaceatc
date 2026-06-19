@@ -140,7 +140,11 @@ export const MetricsBar: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom row — sim clock + speed selector */}
+      {/* Bottom row — sim clock + speed selector.
+          Hidden on the Onboard Reflex tab: these control the orbital propagation
+          speed of the globe, which isn't shown in Reflex mode (it has its own
+          frame/playback controls), so they'd read as dead controls there. */}
+      {activeTab === 'ground' && (
       <div className="flex items-center justify-between px-6 h-9 bg-[#060a14] border-t border-white/5">
         {/* Sim clock */}
         <div className="flex items-center space-x-2 text-xs font-mono">
@@ -195,6 +199,7 @@ export const MetricsBar: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };
