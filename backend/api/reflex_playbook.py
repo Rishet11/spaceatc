@@ -102,6 +102,33 @@ def classify_threat(detected: bool, distance_m: float) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# Decision-Loop Replay — relative range as an explicitly-labeled swept input
+# ---------------------------------------------------------------------------
+# The benchmark clip never closes to the evasion threshold, so to demonstrate
+# the *full* autonomous policy (scan -> monitor -> prime -> evade) we sweep the
+# relative range across the bands. This is a demonstration input, NOT a CV
+# measurement — detection + decision logic stay live and the UI labels it as a
+# swept range. Pure logic kept here so it is unit-testable without torch/OpenCV.
+REPLAY_RANGE_FAR_M = 5.0
+REPLAY_RANGE_NEAR_M = 0.6
+
+
+def swept_range(
+    frame_idx: int,
+    total: int,
+    far_m: float = REPLAY_RANGE_FAR_M,
+    near_m: float = REPLAY_RANGE_NEAR_M,
+) -> float:
+    """Linear range ramp ``far_m`` -> ``near_m`` across the clip so the agent
+    walks every threat band; the final frames cross ``WARNING_RANGE_M`` into
+    CRITICAL/evade."""
+    if total <= 1:
+        return near_m
+    t = max(0.0, min(1.0, frame_idx / (total - 1)))
+    return far_m + t * (near_m - far_m)
+
+
+# ---------------------------------------------------------------------------
 # Retrieval (RAG)
 # ---------------------------------------------------------------------------
 def retrieve_plays(detected: bool, distance_m: float, k: int = 2) -> list[dict]:

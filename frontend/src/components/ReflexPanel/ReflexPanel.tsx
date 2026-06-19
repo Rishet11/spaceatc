@@ -42,6 +42,14 @@ export const ReflexPanel: React.FC = () => {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
+  // Decision-Loop Replay: sweeps the relative range across threat bands to
+  // demonstrate the full autonomous policy on the benchmark clip. Detection +
+  // decision logic stay live; only the range is a labeled swept input.
+  const [replayMode, setReplayMode] = useState<boolean>(false);
+  // Prewarm progress so playback is smooth instead of laggy on first pass.
+  const [bufferReady, setBufferReady] = useState<number>(0);
+  const [bufferTotal, setBufferTotal] = useState<number>(0);
+  const [prewarmNonce, setPrewarmNonce] = useState<number>(0);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
@@ -67,7 +75,7 @@ export const ReflexPanel: React.FC = () => {
     const seq = ++fetchSeqRef.current;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/reflex/frame/${idx}`);
+      const res = await fetch(`/api/reflex/frame/${idx}${replayMode ? '?mode=replay' : ''}`);
       if (!res.ok) {
         // Surface the backend's human-readable reason (e.g. 503 when the YOLO26
         // weights or video are unavailable on the deployment) instead of a
@@ -108,10 +116,31 @@ export const ReflexPanel: React.FC = () => {
     }
   };
 
-  // 3. Trigger fetch when currentFrame changes
+  // 3. Trigger fetch when the frame or the replay mode changes
   useEffect(() => {
     fetchFrame(currentFrame);
-  }, [currentFrame]);
+  }, [currentFrame, replayMode]);
+
+  // 3b. Pre-warm: background-compute frames into the server cache so playback is
+  // smooth instead of running CPU inference live per frame. Re-runs on mount,
+  // when replay mode toggles, and after an upload/reset (via prewarmNonce).
+  useEffect(() => {
+    const q = replayMode ? '?mode=replay' : '';
+    setBufferReady(0);
+    setBufferTotal(0);
+    fetch(`/api/reflex/prewarm${q}`, { method: 'POST' }).catch(() => {});
+    const poll = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/reflex/prewarm_status${q}`);
+        if (!r.ok) return;
+        const d = await r.json();
+        setBufferReady(d.ready ?? 0);
+        setBufferTotal(d.total ?? 0);
+        if (d.done || (d.total > 0 && (d.ready ?? 0) >= d.total)) clearInterval(poll);
+      } catch { /* ignore prewarm poll errors */ }
+    }, 1500);
+    return () => clearInterval(poll);
+  }, [replayMode, prewarmNonce]);
 
   // 4. Playback loop
   useEffect(() => {
@@ -139,6 +168,13 @@ export const ReflexPanel: React.FC = () => {
     setIsPlaying(false);
     setCurrentFrame(0);
     setLogMessages([]);
+  };
+
+  const toggleReplay = () => {
+    setIsPlaying(false);
+    setCurrentFrame(0);
+    setLogMessages([]);
+    setReplayMode((m) => !m);
   };
 
   const handleStepForward = () => {
@@ -188,7 +224,10 @@ export const ReflexPanel: React.FC = () => {
       setCurrentFrame(0);
       setVideoFileName(file.name);
       setFrameData(null);
-      
+      // An uploaded clip shows REAL measured range, not the replay sweep.
+      setReplayMode(false);
+      setPrewarmNonce((n) => n + 1);
+
       setLogMessages((prev) => [
         ...prev,
         `[SYSTEM] Dynamic video stream loaded: ${file.name}`,
@@ -220,6 +259,7 @@ export const ReflexPanel: React.FC = () => {
       setCurrentFrame(0);
       setVideoFileName(null);
       setFrameData(null);
+      setPrewarmNonce((n) => n + 1);
       setLogMessages((prev) => [
         ...prev,
         `[SYSTEM] Reset to default Starlink Tango debris video stream.`,
@@ -281,20 +321,33 @@ export const ReflexPanel: React.FC = () => {
                 ONBOARD CAM — TANGO SATELLITE
               </span>
             </div>
-            {/* Status Badge */}
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-mono text-gray-400">STATUS:</span>
-              <span
-                className={`px-3 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider ${
-                  frameData?.status === "CRITICAL"
-                    ? "bg-red-600/20 text-red-500 border border-red-500/40"
-                    : frameData?.status === "WARNING"
-                    ? "bg-amber-600/20 text-amber-500 border border-amber-500/40"
-                    : "bg-emerald-600/20 text-emerald-500 border border-emerald-500/40"
+            {/* Replay toggle + status badge */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={toggleReplay}
+                title="Sweep the relative range across threat bands to demonstrate the full autonomous decision policy. Detection and decision logic stay live; the range is a labeled swept input."
+                className={`px-3 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                  replayMode
+                    ? "bg-sky-600/30 text-sky-300 border-sky-500/50"
+                    : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                {frameData?.status ?? "OFFLINE"}
-              </span>
+                {replayMode ? "● Decision-Loop Replay" : "Decision-Loop Replay"}
+              </button>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-mono text-gray-400">STATUS:</span>
+                <span
+                  className={`px-3 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider ${
+                    frameData?.status === "CRITICAL"
+                      ? "bg-red-600/20 text-red-500 border border-red-500/40"
+                      : frameData?.status === "WARNING"
+                      ? "bg-amber-600/20 text-amber-500 border border-amber-500/40"
+                      : "bg-emerald-600/20 text-emerald-500 border border-emerald-500/40"
+                  }`}
+                >
+                  {frameData?.status ?? "OFFLINE"}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -317,6 +370,17 @@ export const ReflexPanel: React.FC = () => {
             {isEvading && (
               <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-red-950/80 border border-red-500/60 px-4 py-1.5 rounded text-xs font-mono text-red-400 font-bold tracking-wider">
                 EVASION ACTIVE — debris &lt;1.5 m
+              </div>
+            )}
+            {replayMode && (
+              <div className="absolute top-3 left-3 z-30 max-w-[55%] bg-sky-950/85 border border-sky-500/50 px-3 py-1.5 rounded text-[10px] font-mono text-sky-300 leading-snug">
+                DECISION-LOOP REPLAY · range is a swept demonstration input — detection &amp; decision logic are live
+              </div>
+            )}
+            {bufferTotal > 0 && bufferReady < bufferTotal && (
+              <div className="absolute bottom-3 left-3 z-30 flex items-center space-x-2 bg-black/70 border border-white/10 px-2.5 py-1 rounded text-[10px] font-mono text-emerald-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Buffering {Math.round((bufferReady / bufferTotal) * 100)}%</span>
               </div>
             )}
 
