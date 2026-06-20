@@ -136,7 +136,7 @@ async def generate_operator_bid(state: AgentState) -> dict:
         from backend.config import settings
         if settings.gemini_api_key:
             genai.configure(api_key=settings.gemini_api_key)
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            model = genai.GenerativeModel(settings.gemini_model)
             prompt = f"In one sentence, explain why {winner} was selected over {loser} for this maneuver. Delta-V values: {winner_dv:.3f} m/s vs {loser_dv:.3f} m/s."
             response = await model.generate_content_async(prompt)
             if response.text:
