@@ -100,15 +100,18 @@ async def run_pipeline(session_id: str) -> AgentState:
     # Initialize the graph
     await app.aupdate_state(config, state)
 
-    # Use stream_mode="values" to process state changes after each node
+    # Stream state values after each node and broadcast only newly appended
+    # websocket events. Nodes append to state["websocket_events"] cumulatively,
+    # so a cursor over the growing list emits each event exactly once. We do not
+    # clear the channel via aupdate_state: it is written by multiple nodes, so a
+    # manual update is ambiguous under LangGraph 1.x and raises
+    # "Ambiguous update, specify as_node".
+    broadcast_count = 0
     async for chunk in app.astream(None, config=config, stream_mode="values"):
         events = chunk.get("websocket_events", [])
-        for event in events:
+        for event in events[broadcast_count:]:
             await broadcast_queue.put(event)
-            
-        if events:
-            # Drain the events from the graph state
-            await app.aupdate_state(config, {"websocket_events": []})
+        broadcast_count = len(events)
 
     final_state = await app.aget_state(config)
     return final_state.values
@@ -121,18 +124,21 @@ async def resume_after_hitl(session_id: str, decision: str) -> AgentState:
     app = await get_graph()
     config = {"configurable": {"thread_id": session_id}}
     
+    # Events broadcast during the pre-HITL run are already in the checkpoint.
+    # Seed the cursor past them so the resume only broadcasts new events.
+    pre = await app.aget_state(config)
+    broadcast_count = len((pre.values or {}).get("websocket_events", []))
+
     update_data = {"hitl_decision": decision}
     await app.aupdate_state(config, update_data)
-    
+
     from backend.main import broadcast_queue
 
     async for chunk in app.astream(None, config=config, stream_mode="values"):
         events = chunk.get("websocket_events", [])
-        for event in events:
+        for event in events[broadcast_count:]:
             await broadcast_queue.put(event)
-            
-        if events:
-            await app.aupdate_state(config, {"websocket_events": []})
+        broadcast_count = len(events)
             
     final_state = await app.aget_state(config)
     return final_state.values

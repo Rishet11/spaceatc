@@ -1,7 +1,10 @@
-# SpaceATC Backend Dependencies — PRD Section 3
+# SpaceATC Backend Dependencies (PRD Section 3)
 fastapi>=0.111
-langgraph>=0.2
-langgraph-checkpoint-sqlite>=2.0
+# Pinned to the exact tested versions: LangGraph 1.x made update_state strict
+# about ambiguous multi-writer channels, which previously broke the pipeline
+# when the unpinned floor drifted to a new major on the deploy build.
+langgraph==1.2.5
+langgraph-checkpoint-sqlite==3.1.0
 sgp4>=2.23
 numpy>=1.26
 scipy>=1.13
@@ -15,7 +18,7 @@ aiosqlite>=0.20
 # OrbitMind Reflex inference (video pose). torch + torchvision are installed as
 # CPU-only wheels in the Dockerfile; the rest resolve normally.
 # NOTE: the detector is YOLO26 (trained in OrbitMind/improved-yolo-spn.ipynb).
-# YOLO26 support landed in the ultralytics 8.3 line — an older wheel cannot load
+# YOLO26 support landed in the ultralytics 8.3 line; an older wheel cannot load
 # best (1).pt. Keep this floor; the Docker build runs OrbitMind/check_model.py to
 # surface a stale wheel or unresolved LFS weights in the build log.
 ultralytics>=8.3.0
