@@ -21,7 +21,13 @@ function Dashboard() {
   const decisionOutcome = useSpaceStore(s => s.decisionOutcome);
   const isCollision = decisionOutcome?.decision === 'veto';
   const [isInjecting, setIsInjecting] = useState(false);
+  const wsConnected = useSpaceStore(s => s.wsConnected);
+  const [everConnected, setEverConnected] = useState(false);
   useWebSocket();
+
+  useEffect(() => {
+    if (wsConnected) setEverConnected(true);
+  }, [wsConnected]);
 
   useEffect(() => {
     fetch('/api/satellites')
@@ -62,7 +68,7 @@ function Dashboard() {
       } else if (body?.status === 'no_conjunction') {
         addToast(body?.detail || 'Pipeline ran but no conjunction was detected.', 'info');
       } else {
-        addToast('Conjunction injected — running negotiation…', 'success');
+        addToast('Conjunction injected, running negotiation...', 'success');
       }
     } catch (e) {
       console.error("Failed to inject demo", e);
@@ -74,6 +80,11 @@ function Dashboard() {
 
   return (
     <div className="w-screen h-screen flex flex-col bg-[#0a0f1e] text-white overflow-hidden relative">
+      {!wsConnected && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[100] px-3 py-1 rounded bg-black/70 border border-white/10 text-[11px] font-mono text-gray-300 pointer-events-none">
+          {everConnected ? 'Backend offline, retrying...' : 'Connecting to mission control...'}
+        </div>
+      )}
       <MetricsBar />
       {activeTab === 'ground' ? (
         <div className="flex-1 flex flex-row overflow-hidden">

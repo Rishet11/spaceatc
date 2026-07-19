@@ -104,7 +104,7 @@ SpaceATC fills the uncoordinated handoff gap with **two layers of autonomy**:
 * **LangGraph 1.x** (Multi-agent orchestration + interrupt/checkpoint)
 * **sgp4 2.23+** (Orbital propagation - Brandon Rhodes)
 * **numpy & scipy** (Vector math & bounded optimization)
-* **Gemini** (agent reasoning, behind a deterministic guardrail)
+* **Groq** (`openai/gpt-oss-120b`, agent reasoning, behind a deterministic guardrail)
 * **SQLite / aiosqlite** (State persistence + LangGraph checkpoints)
 
 ### OrbitMind (Onboard Reflex)
@@ -128,7 +128,7 @@ git clone <repo>
 cd spaceatc/backend
 pip install -r requirements.txt
 cp ../.env.example ../.env
-# IMPORTANT: Add your GEMINI_API_KEY to .env before starting
+# IMPORTANT: Add your GROQ_API_KEY to .env before starting
 uvicorn main:app --reload --port 7860
 ```
 

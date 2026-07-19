@@ -5,7 +5,7 @@ Usage:
     from backend.config import settings
     print(settings.celestrak_base_url)
 
-LLM: all AI calls use Gemini via google-generativeai.
+LLM: all AI calls use Groq via the `groq` package.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # env var if the deployment key serves a different model (no code change).
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash"
+
+    # --- LLM (Groq) ---
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-120b"
 
     # --- Database ---
     sqlite_path: str = "./spaceatc.db"

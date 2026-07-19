@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 sat_cache = {}
 latest_session_id = "demo_session"
 
+# Set by main.py's _load_satellites: "live" when the last CelesTrak fetch
+# succeeded, "cache" when it fell back to the bundled TLE file.
+DATA_SOURCE = "cache"
+
 
 class SimSpeedBody(BaseModel):
     speed: float
@@ -78,6 +82,7 @@ async def health_check():
         "status": "ok",
         "satellites": len(sats),
         "sat_cache": len(sat_cache),
+        "data_source": DATA_SOURCE,
         "timestamp": datetime.now(tz=timezone.utc).isoformat(),
     }
 

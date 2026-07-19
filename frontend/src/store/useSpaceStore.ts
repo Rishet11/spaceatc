@@ -39,6 +39,9 @@ export interface SpaceState {
   setSimSpeed: (speed: number) => void;
   setSimTime: (time: string) => void;
 
+  wsConnected: boolean;
+  setWsConnected: (connected: boolean) => void;
+
   updateSatellites: (sats: Satellite[]) => void;
   updateMetrics: (m: Partial<SpaceState>) => void;
   addFeedEvent: (event: EventLogItem) => void;
@@ -93,6 +96,9 @@ export const useSpaceStore = create<SpaceState>((set) => ({
 
   simSpeed: 60,
   simTime: '',
+
+  wsConnected: false,
+  setWsConnected: (connected) => set({ wsConnected: connected }),
 
   updateMetrics: (m) => set((state) => ({
     ...state,

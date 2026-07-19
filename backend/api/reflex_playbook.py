@@ -204,20 +204,18 @@ def _fallback_decision(status: str, plays: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# LLM reasoning (Gemini) — reuses settings.gemini_api_key
+# LLM reasoning (Groq) — reuses settings.groq_api_key
 # ---------------------------------------------------------------------------
 async def _llm_reflex_decision(
     status: str, threat_level: str, detected: bool, distance_m: float,
     translation: list[float], plays: list[dict],
 ) -> dict | None:
     from backend.config import settings
-    if not settings.gemini_api_key:
+    if not settings.groq_api_key:
         return None
     try:
-        import google.generativeai as genai
+        from backend.llm import groq_chat
 
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(settings.gemini_model)
         play_text = "\n".join(
             f"- {p['name']}: {p['action']} (applies when {p['applies_when']})" for p in plays
         ) or "- (no target; continue scanning)"
@@ -241,11 +239,14 @@ async def _llm_reflex_decision(
             "\"Executing Evasion\". Do not repeat the play name (it is logged separately).\n"
             f'  "dodge_command": {cmd_spec}.'
         )
-        resp = await model.generate_content_async(
+        raw = await groq_chat(
             prompt,
-            generation_config={"response_mime_type": "application/json"},
+            system="You are the onboard autonomous reflex agent of a satellite.",
+            json_mode=True,
         )
-        data = json.loads(resp.text)
+        if raw is None:
+            return None
+        data = json.loads(raw)
         reasoning = [str(x) for x in data.get("reasoning", []) if str(x).strip()]
         if not reasoning:
             return None

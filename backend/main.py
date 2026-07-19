@@ -71,6 +71,7 @@ from backend.orbital.tle_client import fetch_and_parse, CELESTRAK_STARLINK_TLE
 from backend.orbital.propagator import propagate_at, eci_to_geodetic
 from backend.api.websocket import manager, websocket_endpoint
 from backend.api.routes import router as api_router, sat_cache
+import backend.api.routes as routes_module
 from backend.api.reflex import router as reflex_router
 from backend.api.schemas import WSMessage, WSMessageType
 from backend.agents.graph import get_graph
@@ -204,8 +205,13 @@ async def _load_satellites():
         sats, source = await fetch_and_parse(CELESTRAK_STARLINK_TLE, return_source=True)
         if sats and source == "network":
             await _ingest_sats(sats, "network")
+            routes_module.DATA_SOURCE = "live"
+        else:
+            routes_module.DATA_SOURCE = "cache"
     except Exception as e:
+        routes_module.DATA_SOURCE = "cache"
         logger.info("Live TLE refresh unavailable (%s); staying on bundled cache.", type(e).__name__)
+    logger.info("TLE data source: %s", routes_module.DATA_SOURCE)
 
 
 @asynccontextmanager

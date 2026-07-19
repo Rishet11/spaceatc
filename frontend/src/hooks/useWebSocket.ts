@@ -20,6 +20,7 @@ export const useWebSocket = () => {
     setNegotiationBids,
     resetForNewConjunction,
     addToast,
+    setWsConnected,
   } = useSpaceStore();
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export const useWebSocket = () => {
       ws.onopen = () => {
         console.log('WebSocket connected');
         backoff = 1000; // Reset backoff on successful connect
+        setWsConnected(true);
         if (warnedDisconnectRef.current) {
           addToast('Live connection restored.', 'success');
           warnedDisconnectRef.current = false;
@@ -44,6 +46,7 @@ export const useWebSocket = () => {
 
       ws.onclose = () => {
         console.log(`WebSocket disconnected, reconnecting in ${backoff}ms...`);
+        setWsConnected(false);
         // Warn once per disconnect episode so reconnect attempts don't spam toasts.
         if (!warnedDisconnectRef.current) {
           addToast('Live connection lost — reconnecting…', 'error');

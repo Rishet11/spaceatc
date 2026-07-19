@@ -131,18 +131,9 @@ async def generate_operator_bid(state: AgentState) -> dict:
     loser_dv = loser_proposal["delta_v_ms"]
 
     rationale = f"{winner} selected: \u0394V {winner_dv:.3f} m/s. Mission impact: LOW."
-    try:
-        import google.generativeai as genai
-        from backend.config import settings
-        if settings.gemini_api_key:
-            genai.configure(api_key=settings.gemini_api_key)
-            model = genai.GenerativeModel(settings.gemini_model)
-            prompt = f"In one sentence, explain why {winner} was selected over {loser} for this maneuver. Delta-V values: {winner_dv:.3f} m/s vs {loser_dv:.3f} m/s."
-            response = await model.generate_content_async(prompt)
-            if response.text:
-                rationale = response.text.strip()
-    except Exception as e:
-        logger.error(f"Gemini API call failed: {e}")
+    from backend.llm import groq_chat
+    prompt = f"In one sentence, explain why {winner} was selected over {loser} for this maneuver. Delta-V values: {winner_dv:.3f} m/s vs {loser_dv:.3f} m/s."
+    rationale = await groq_chat(prompt) or rationale
 
     winner_msg = f"[COORDINATOR] Winner: {winner} \u2014 lowest cost maneuver selected"
     all_messages = bid_messages + [winner_msg]

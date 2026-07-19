@@ -27,7 +27,7 @@ git lfs install
 - Go to https://huggingface.co → **New → Space**
 - **SDK: Docker**, name e.g. `spaceatc`, hardware **CPU basic** (free)
 - In the Space → **Settings → Variables and secrets → New secret**:
-  `GEMINI_API_KEY = <your key>`
+  `GROQ_API_KEY = <your key>`
 
 ### 3. Commit the weights (via LFS) and push to the Space
 From the repo root:
@@ -62,6 +62,6 @@ goes green, open `https://<your-username>-spaceatc.hf.space`.
 ## Local sanity check before pushing
 ```bash
 docker build -t spaceatc .
-docker run -p 7860:7860 -e GEMINI_API_KEY=<key> spaceatc
+docker run -p 7860:7860 -e GROQ_API_KEY=<key> spaceatc
 # open http://localhost:7860
 ```
