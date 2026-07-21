@@ -162,3 +162,8 @@ curl -X POST http://localhost:7860/api/demo/inject
 ## 👥 Team
 **ClauseZero** | FAR AWAY 2026  
 *Track: Space & Aerospace + Agentic & Autonomous Systems*
+
+[![GitHub](https://img.shields.io/badge/GitHub-nilaysureka-181717?style=flat-square&logo=github)](https://github.com/nilaysureka)
+[![GitHub](https://img.shields.io/badge/GitHub-Rishet11-181717?style=flat-square&logo=github)](https://github.com/Rishet11)
+[![GitHub](https://img.shields.io/badge/GitHub-Parv7J-181717?style=flat-square&logo=github)](https://github.com/Parv7-J)
+[![GitHub](https://img.shields.io/badge/GitHub-RaghavMadan07-181717?style=flat-square&logo=github)](https://github.com/RaghavMadan07)
