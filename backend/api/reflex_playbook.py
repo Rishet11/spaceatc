@@ -311,16 +311,21 @@ async def _llm_reflex_decision(
             f"translation={[round(t, 2) for t in translation]}, "
             f"threat_level={threat_level}, status={status}.\n\n"
             f"Retrieved playbook (RAG):\n{play_text}\n\n"
-            "Respond as JSON with keys:\n"
-            '  "reasoning": array of 2-3 short onboard-log lines that justify the chosen play. '
-            "End with a line starting \"Verdict:\"; for CRITICAL also include a line starting "
-            "\"Executing Evasion\". Do not repeat the play name (it is logged separately).\n"
-            f'  "dodge_command": {cmd_spec}.'
+            "Respond as JSON with exactly two top-level keys, \"reasoning\" and \"dodge_command\", "
+            "and nothing else:\n"
+            '  "reasoning": array of onboard-log lines (max 12 words each) — EXACTLY 1 line for '
+            "non-CRITICAL status, or EXACTLY 2 lines for CRITICAL status. For non-CRITICAL, that "
+            "one line must start with \"Verdict:\". For CRITICAL, the first line must start with "
+            "\"Executing Evasion\" and the second must start with \"Verdict:\". Do not repeat the "
+            "play name (it is logged separately).\n"
+            f'  "dodge_command": {cmd_spec} If not null, its "reason" field must be max 8 words.'
         )
         raw = await groq_chat(
             prompt,
             system="You are the onboard autonomous reflex agent of a satellite.",
             json_mode=True,
+            max_tokens=500,
+            reasoning_effort="low",
         )
         if raw is None:
             return None
