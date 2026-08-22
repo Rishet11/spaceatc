@@ -3,6 +3,11 @@
 ## What it is
 SpaceATC: multi-agent orbital collision-avoidance system. LangGraph negotiates satellite maneuvers with human-in-the-loop approval, rendered on a live WebGL globe. Includes OrbitMind, a separate vision-based onboard reflex demo (YOLO + pose + deterministic safety envelope).
 
+## Round 2: Content Readiness Review
+`backend/content_review.py` is a new, deterministic, network-free module that reviews LLM-authored prose (the reflex narrative and the negotiation rationale) for completeness and consistency before it is cached or shown to a human. A failed review falls back to deterministic text instead of shipping the rejected prose. Wired into `backend/api/reflex_playbook.py` (before the per-band `_DECISION_CACHE` write) and `backend/agents/nodes/operator_agent.py` (before `winning_proposal["rationale"]` is set). Surfaced in the UI as a three-state pill on the ReflexPanel (`Content Reviewed` green / `Safe Fallback` amber / `Deterministic` grey — the last means no prose was generated at all, not a rejection) and an `AI RATIONALE` row on the HITLPanel. See `ROUND2.md` for the full writeup.
+
+A demo fixture forces a genuine rejection on demand: `GET /api/reflex/frame/{idx}?force_bad_narrative=true` (`backend/api/reflex.py:553-571`) runs a hardcoded malformed narrative through the real reviewer, bypassing both `_DECISION_CACHE` and `_FRAME_CACHE` so it can't contaminate later normal requests. No auth gates it. See `ROUND2.md` §4 and `HANDOFF.md` §3.
+
 ## How to run
 Backend (authoritative port per README.md and app config: 7860):
 ```
@@ -23,7 +28,7 @@ lsof -ti:7860 | xargs kill
 lsof -ti:5173 | xargs kill
 ```
 
-Tests: `pytest test_*.py` from repo root (offline, Python 3.11+).
+Tests: `pytest test_*.py` from repo root (offline, Python 3.11+). 33 tests pass as of Round 2 (`./.venv-audit/bin/python -m pytest test_*.py -q --asyncio-mode=auto`).
 
 ## LLM narrative: now Groq
 The agent negotiation narrative uses Groq, not just Gemini. Set `GROQ_API_KEY` in the gitignored `.env` file. Without it, a deterministic fallback narrative runs; the app does not crash.

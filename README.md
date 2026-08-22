@@ -35,6 +35,8 @@ SpaceATC fills the uncoordinated handoff gap with **two layers of autonomy**:
 
 **Layer 2 — OrbitMind Onboard Reflex (vision-based proximity operations).** A satellite-side perception to decision loop for close-proximity encounters: **YOLO26** detects the target and **MobileNetV3** regresses its **6-DOF metric pose** (via the ESA SPEED+ camera model), feeding an onboard decision engine that classifies the range band deterministically, reasons over a retrieval-grounded evasion playbook (LLM+RAG), and emits a thruster command **validated against a deterministic safety envelope** so the model never commands thrusters directly. Demonstrated on the **ESA SPEED+ Tango spacecraft-proximity benchmark**.
 
+**Content Readiness Review (ethical safeguard, Round 2).** The maneuver math above is deterministic and fails closed; the AI surface in this system is narrow — the onboard reflex narrative and the negotiation rationale, both LLM-authored prose shown to a human before a decision. `backend/content_review.py` is a synchronous, network-free, stdlib-only checker (no LLM in the loop, so it cannot be fooled by the thing it reviews) that gates both surfaces for completeness and consistency against the deterministic facts computed elsewhere, before either the reflex narrative is cached per threat band or the negotiation rationale is shipped to the HITL panel. A failed review falls back to deterministic text rather than serving the rejected prose. See `ROUND2.md` for the full writeup and demo script.
+
 ---
 
 ## 🏗️ Architecture

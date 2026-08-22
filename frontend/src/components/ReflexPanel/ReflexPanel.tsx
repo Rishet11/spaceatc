@@ -14,6 +14,8 @@ import {
   Upload,
   Video
 } from 'lucide-react';
+import { SAFE_RANGE_M, WARNING_RANGE_M } from '../../constants/thresholds';
+import { Tooltip } from '../Tooltip';
 
 interface FrameData {
   image: string;
@@ -28,10 +30,15 @@ interface FrameData {
   threat_level: string;
   decision_log: string;
   dodge_command: any | null;
+  content_review?: {
+    passed: boolean;
+    used_fallback: boolean;
+    reasons: string[];
+  };
 }
 
 export const ReflexPanel: React.FC = () => {
-  const [totalFrames, setTotalFrames] = useState<number>(100);
+  const [totalFrames, setTotalFrames] = useState<number>(0);
   const [currentFrame, setCurrentFrame] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [frameData, setFrameData] = useState<FrameData | null>(null);
@@ -50,6 +57,8 @@ export const ReflexPanel: React.FC = () => {
   const [bufferReady, setBufferReady] = useState<number>(0);
   const [bufferTotal, setBufferTotal] = useState<number>(0);
   const [prewarmNonce, setPrewarmNonce] = useState<number>(0);
+  const [totalFramesFetchState, setTotalFramesFetchState] = useState<'checking' | 'ready' | 'unavailable'>('checking');
+  const [frameFetchState, setFrameFetchState] = useState<'checking' | 'ready' | 'unavailable'>('checking');
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
@@ -63,10 +72,14 @@ export const ReflexPanel: React.FC = () => {
         if (!res.ok) throw new Error("Failed to fetch total frames");
         return res.json();
       })
-      .then((data) => setTotalFrames(data.total_frames))
+       .then((data) => {
+         setTotalFrames(data.total_frames);
+         setTotalFramesFetchState('ready');
+       })
       .catch((err) => {
         console.error(err);
-        setTotalFrames(100); // fallback
+         setTotalFrames(0);
+         setTotalFramesFetchState('unavailable');
       });
   }, []);
 
@@ -90,6 +103,7 @@ export const ReflexPanel: React.FC = () => {
       const data: FrameData = await res.json();
       if (seq !== fetchSeqRef.current) return; // a newer request superseded this one
       setFrameData(data);
+      setFrameFetchState('ready');
       setError(null);
 
       // Append decision logs to local terminal state
@@ -110,6 +124,8 @@ export const ReflexPanel: React.FC = () => {
 
     } catch (err: any) {
       if (seq !== fetchSeqRef.current) return;
+      setFrameData(null);
+      setFrameFetchState('unavailable');
       setError(err.message || "Failed to load frame data");
     } finally {
       if (seq === fetchSeqRef.current) setIsLoading(false);
@@ -273,7 +289,7 @@ export const ReflexPanel: React.FC = () => {
   };
 
   // Trajectory Simulation Logic: calculate offsets based on state
-  const distance = frameData?.pose.distance ?? 5.0;
+  const distance = frameData?.pose.distance ?? null;
   const isEvading = frameData?.status === "CRITICAL";
   const isWarning = frameData?.status === "WARNING";
 
@@ -304,17 +320,15 @@ export const ReflexPanel: React.FC = () => {
   // the path are always consistent and the maneuver is visible exactly when the
   // safety check actually fires.
   // ---------------------------------------------------------------------
-  const SAFE_RANGE_M = 2.2;   // backend/api/reflex_playbook.py:76
-  const WARNING_RANGE_M = 1.5; // backend/api/reflex_playbook.py:77
   const CLOSEST_RANGE_M = 0.6; // REPLAY_RANGE_NEAR_M
 
   // How far through the approach we are (0 = first warning, 1 = closest point).
-  const approach = Math.max(
+  const approach = distance === null ? 0 : Math.max(
     0,
     Math.min(1, (SAFE_RANGE_M - distance) / (SAFE_RANGE_M - CLOSEST_RANGE_M))
   );
   // How committed the evasion is (0 at the CRITICAL threshold, 1 at closest).
-  const evadeAmount = Math.max(
+  const evadeAmount = distance === null ? 0 : Math.max(
     0,
     Math.min(1, (WARNING_RANGE_M - distance) / (WARNING_RANGE_M - CLOSEST_RANGE_M))
   );
@@ -366,13 +380,9 @@ export const ReflexPanel: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center space-x-4 text-[10px] font-mono text-gray-500">
-            {/* Bands must match backend/api/reflex_playbook.py:76-77 —
-                SAFE_RANGE_M = 2.2, WARNING_RANGE_M = 1.5. The legend
-                previously claimed SAFE was anything above 1.5 m, which
-                contradicted the amber chip sitting next to it. */}
-            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span>SAFE (&gt;2.2 m)</span></span>
-            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /><span>WARNING (1.5&ndash;2.2 m)</span></span>
-            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /><span>EVASION (&lt;1.5 m)</span></span>
+             <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span>SAFE (&gt;{SAFE_RANGE_M} m)</span></span>
+             <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /><span>WARNING ({WARNING_RANGE_M}&ndash;{SAFE_RANGE_M} m)</span></span>
+             <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /><span>EVASION (&lt;{WARNING_RANGE_M} m)</span></span>
           </div>
         </div>
       </div>
@@ -447,7 +457,7 @@ export const ReflexPanel: React.FC = () => {
             )}
             {isEvading && (
               <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30 bg-red-950/80 border border-red-500/60 px-4 py-1.5 rounded text-xs font-mono text-red-400 font-bold tracking-wider">
-                EVASION ACTIVE · range &lt;1.5 m{replayMode ? " (simulated)" : ""}
+                 EVASION ACTIVE · range &lt;{WARNING_RANGE_M} m{replayMode ? " (simulated)" : ""}
               </div>
             )}
             {replayMode && (
@@ -539,7 +549,7 @@ export const ReflexPanel: React.FC = () => {
                 className="flex-1 accent-emerald-500 h-1 bg-white/10 rounded-lg cursor-pointer"
               />
               <span className="text-xs font-mono text-gray-300 w-16 text-right">
-                {currentFrame + 1} / {totalFrames}
+                 {totalFrames > 0 ? `${currentFrame + 1} / ${totalFrames}` : "- / -"}
               </span>
             </div>
 
@@ -605,8 +615,18 @@ export const ReflexPanel: React.FC = () => {
               <div className="mt-3 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <span className="text-[10px] font-mono text-gray-500">PIPELINE:</span>
-                  <span className="text-[10px] font-mono font-bold text-emerald-500 uppercase tracking-widest bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-500/20">
-                    READY
+                   <span className={`text-[10px] font-mono font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${
+                     totalFramesFetchState === 'ready' && frameFetchState === 'ready'
+                       ? "text-emerald-500 bg-emerald-950/30 border-emerald-500/20"
+                       : totalFramesFetchState === 'unavailable' || frameFetchState === 'unavailable'
+                       ? "text-red-500 bg-red-950/30 border-red-500/20"
+                       : "text-amber-400 bg-amber-950/30 border-amber-500/20"
+                   }`}>
+                     {totalFramesFetchState === 'ready' && frameFetchState === 'ready'
+                       ? "READY"
+                       : totalFramesFetchState === 'unavailable' || frameFetchState === 'unavailable'
+                       ? "UNAVAILABLE"
+                       : "CHECKING"}
                   </span>
                 </div>
                 
@@ -705,15 +725,15 @@ export const ReflexPanel: React.FC = () => {
               <div className="space-y-2 font-mono text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">X:</span>
-                  <span className="font-bold text-white">{frameData?.pose.translation[0].toFixed(3) ?? "0.000"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[0].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Y:</span>
-                  <span className="font-bold text-white">{frameData?.pose.translation[1].toFixed(3) ?? "0.000"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[1].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Z:</span>
-                  <span className="font-bold text-white">{frameData?.pose.translation[2].toFixed(3) ?? "0.000"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[2].toFixed(3) : "—"}</span>
                 </div>
               </div>
             </div>
@@ -724,19 +744,19 @@ export const ReflexPanel: React.FC = () => {
               <div className="space-y-1 font-mono text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qw:</span>
-                  <span className="font-bold text-white">{frameData?.pose.quaternion[0].toFixed(3) ?? "1.000"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[0].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qx:</span>
-                  <span className="font-bold text-white">{frameData?.pose.quaternion[1].toFixed(3) ?? "0.000"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[1].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qy:</span>
-                  <span className="font-bold text-white">{frameData?.pose.quaternion[2].toFixed(3) ?? "0.000"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[2].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qz:</span>
-                  <span className="font-bold text-white">{frameData?.pose.quaternion[3].toFixed(3) ?? "0.000"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[3].toFixed(3) : "—"}</span>
                 </div>
               </div>
             </div>
@@ -746,27 +766,26 @@ export const ReflexPanel: React.FC = () => {
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-mono text-gray-400">CLOSEST APPROACH RANGE · {replayMode ? <span className="text-amber-400">SIMULATED</span> : <span className="text-emerald-400">MEASURED</span>}</span>
                 <span
-                  className={`text-lg font-mono font-bold ${
-                    isEvading ? "text-red-500" : isWarning ? "text-amber-500" : "text-emerald-500"
-                  }`}
-                >
-                  {distance.toFixed(2)} m
+                   className={`text-lg font-mono font-bold ${
+                     distance === null ? "text-gray-500" : isEvading ? "text-red-500" : isWarning ? "text-amber-500" : "text-emerald-500"
+                   }`}
+                 >
+                   {distance === null ? "—" : `${distance.toFixed(2)} m`}
                 </span>
               </div>
               {/* Range status bar */}
               <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden relative border border-white/5">
                 <div
-                  className={`h-full transition-all duration-150 rounded-full ${
-                    isEvading ? "bg-red-500" : isWarning ? "bg-amber-500" : "bg-emerald-500"
-                  }`}
-                  style={{ width: `${Math.min(100, (distance / 5.0) * 100)}%` }}
-                />
-                {/* 1.5m Threshold marker */}
-                <div className="absolute left-[30%] top-0 bottom-0 w-[2px] bg-red-600" title="1.5m Alert Limit" />
+                   className={`h-full transition-all duration-150 rounded-full ${
+                     distance === null ? "bg-gray-500" : isEvading ? "bg-red-500" : isWarning ? "bg-amber-500" : "bg-emerald-500"
+                   }`}
+                   style={{ width: `${distance === null ? 0 : Math.min(100, (distance / 5.0) * 100)}%` }}
+                 />
+                 <div className="absolute top-0 bottom-0 w-[2px] bg-red-600" style={{ left: `${(WARNING_RANGE_M / 5.0) * 100}%` }} title={`${WARNING_RANGE_M}m Alert Limit`} />
               </div>
               <div className="flex justify-between text-[10px] font-mono text-gray-500 mt-1">
                 <span>0.0m (Collision)</span>
-                <span>1.5m (Evasion Threshold)</span>
+                 <span>{WARNING_RANGE_M}m (Evasion Threshold)</span>
                 <span>5.0m+ (Safe)</span>
               </div>
             </div>
@@ -775,16 +794,56 @@ export const ReflexPanel: React.FC = () => {
 
         {/* 2.2 Onboard AI Reasoning Console */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md flex flex-col flex-1 min-h-[350px]">
-          <div className="flex items-start space-x-2 border-b border-white/10 pb-3 mb-4">
-            <Cpu className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
-            <div>
-              <h3 className="text-sm font-mono tracking-widest font-bold text-emerald-400 uppercase">
-                Onboard Decision Engine
-              </h3>
-              <p className="text-[10px] font-mono text-gray-500 mt-0.5">
-                deterministic classification → retrieval-grounded reasoning (LLM+RAG) → guardrail-validated command
-              </p>
+          <div className="flex items-start justify-between space-x-2 border-b border-white/10 pb-3 mb-4">
+            <div className="flex items-start space-x-2">
+              <Cpu className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
+              <div>
+                <h3 className="text-sm font-mono tracking-widest font-bold text-emerald-400 uppercase">
+                  Onboard Decision Engine
+                </h3>
+                <p className="text-[10px] font-mono text-gray-500 mt-0.5">
+                  deterministic classification → retrieval-grounded reasoning (LLM+RAG) → guardrail-validated command
+                </p>
+              </div>
             </div>
+            {(() => {
+              const contentReview = frameData?.content_review;
+              if (!contentReview) return null;
+              const reasons = contentReview.reasons ?? [];
+
+              if (contentReview.passed) {
+                return (
+                  <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border text-emerald-500 bg-emerald-950/30 border-emerald-500/20">
+                    Content Reviewed
+                  </span>
+                );
+              }
+
+              if (contentReview.used_fallback && reasons.length > 0) {
+                return (
+                  <Tooltip text={reasons.join('; ')} position="bottom">
+                    <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border text-amber-400 bg-amber-950/30 border-amber-500/20 cursor-help">
+                      Safe Fallback
+                    </span>
+                  </Tooltip>
+                );
+              }
+
+              if (contentReview.used_fallback && reasons.length === 0) {
+                return (
+                  <Tooltip
+                    text="No narrative was generated (model unavailable). Deterministic text is in use — this is not a review rejection."
+                    position="bottom"
+                  >
+                    <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border text-gray-400 bg-gray-950/30 border-gray-500/20 cursor-help">
+                      Deterministic
+                    </span>
+                  </Tooltip>
+                );
+              }
+
+              return null;
+            })()}
           </div>
 
           {/* Terminal Console */}

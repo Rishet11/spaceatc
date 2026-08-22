@@ -17,9 +17,11 @@ Five parallel deep audits across the frontend, orbital math, LangGraph orchestra
 
 ## ⚠ The single most important thing in this report
 
-**Blocks demo.** The three OrbitMind model and video assets are unresolved Git LFS pointers on this machine — `best (1).pt` is 133 bytes, `keypoint_mobilenet.pth` 132 bytes, `output_h264.mp4` 133 bytes — and `git-lfs` is not installed. Every reflex endpoint returns 503, and the panel hides this: the frontend falls back to a fake `1 / 100` frame slider and still shows a green `PIPELINE: READY` badge. A dead pipeline currently presents as a healthy one.
+**Blocks demo.** The three OrbitMind model and video assets are unresolved Git LFS pointers on this machine — `best (1).pt` is 133 bytes, `keypoint_mobilenet.pth` 132 bytes, `output_h264.mp4` 133 bytes — and `git-lfs` is not installed. Every reflex endpoint returns 503.
 
-**Action:** run `git lfs pull` and confirm the three file sizes before judging.
+**Action:** run `git lfs pull` and confirm the three file sizes before judging. **Still open** — as of this annotation the three assets on disk are still 132/133 bytes (`OrbitMind/keypoint_mobilenet.pth`, `OrbitMind/output_h264.mp4`); `git lfs pull` has not yet been run on this machine.
+
+**Round 2 partial fix — the panel no longer masks a dead pipeline.** The original finding here was two things: (1) the reflex assets are missing, and (2) the UI hid that fact behind a fake `1 / 100` frame slider and a hardcoded green `PIPELINE: READY` badge. (2) is now fixed: `frontend/src/components/ReflexPanel/ReflexPanel.tsx` binds the pipeline badge to tri-state real fetch status (`checking` / `ready` / `unavailable`), `totalFrames` no longer defaults to `100` (it shows `- / -` until a real total is fetched), the closest-approach distance no longer defaults to `5.0` m (which rendered green/SAFE for missing data — it now renders an em dash), and the 6DOF pose block no longer renders `0.000` translations and an identity quaternion with no sensor data behind them. (1), the underlying LFS blocker, is unchanged and still needs `git lfs pull` before a live reflex demo.
 
 ---
 
@@ -143,7 +145,9 @@ Not fixed in this pass. Ordered by how likely a judge is to hit them. The first 
 
 ### The HITL gate is sound in the graph, and wide open over HTTP — **OPEN**
 
-Credit first, because this is worth saying on stage: there is exactly one edge into `execute_maneuver`, it is guarded twice, and it fails *closed* on every error condition tested. **The LLM decides nothing safety-critical** — the Groq rationale is computed and then never read.
+Credit first, because this is worth saying on stage: there is exactly one edge into `execute_maneuver`, it is guarded twice, and it fails *closed* on every error condition tested. **The LLM decides nothing safety-critical.**
+
+**Round 2 update:** the clause originally here read "the Groq rationale is computed and then never read" — that was a real dead-code defect at the time and is no longer accurate. `backend/agents/nodes/operator_agent.py` now runs the rationale through `review_negotiation_rationale` (`backend/content_review.py`) and writes the result into `winning_proposal["rationale"]`, which reaches the frontend via `ManeuverProposalResponse.rationale` and renders as the `AI RATIONALE` row in `HITLPanel.tsx`. The rationale is still non-safety-critical prose, not a decision input, so the sentence's substance ("the LLM decides nothing safety-critical") still holds — only "never read" is now false. See `ROUND2.md` §4.
 
 But the endpoints validate nothing. `update_conjunction_status` issues a bare UPDATE that affects zero rows for an unknown id and raises nothing, then falls back to the most recent session — so `POST /api/hitl/does-not-exist/approve` executes the real pending maneuver for a different event. There is no auth and `allow_origins="*"`, and no compare-and-set, so duplicate or stale decisions are accepted unconditionally.
 

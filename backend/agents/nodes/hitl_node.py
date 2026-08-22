@@ -5,13 +5,12 @@ backend/agents/nodes/hitl_node.py — Node 5: Wait for human-in-the-loop approva
 import logging
 
 from backend.agents.state import AgentState
-from backend.api.schemas import WSMessage, WSMessageType
 
 logger = logging.getLogger(__name__)
 
 async def await_hitl(state: AgentState) -> dict:
     """
-    Queue hitl_request WS event and pause the graph execution until resumed.
+    Pause the graph execution until resumed.
     """
     logger.info("Node: await_hitl starting...")
     
@@ -22,29 +21,5 @@ async def await_hitl(state: AgentState) -> dict:
     winning_proposal = state.get("winning_proposal")
     if not winning_proposal:
         return {"phase": "resolved"}
-        
-    hitl_messages = [
-        "[HITL] Proposal sent to human operator for approval",
-        "[HITL] Awaiting decision \u2014 30 second timeout",
-    ]
 
-    ws_event = WSMessage.now(
-        type_=WSMessageType.hitl_request,
-        payload={
-            "event_id": winning_proposal["event_id"],
-            "proposal": {k: v for k, v in winning_proposal.items() if k != "maneuvering_sat_obj"},
-            "messages": hitl_messages,
-        }
-    ).model_dump()
-
-    # We yield the state updates *before* the interrupt
-    updated_state = {
-        "phase": "pending_hitl",
-        "messages": state.get("messages", []) + hitl_messages,
-        "websocket_events": state.get("websocket_events", []) + [ws_event]
-    }
-
-    # In LangGraph, since we use interrupt_before=["await_hitl"], the graph pauses
-    # *before* entering this node. When we call astream(None) to resume, this node
-    # executes. We just return the updated state to pass through to execute_maneuver.
-    return updated_state
+    return {"phase": "pending_hitl"}

@@ -6,6 +6,6 @@ Run: Frontend: `npm run dev` (port 5173); Backend: `python3 -m server` or check 
 
 Env vars: `GROQ_API_KEY`, `CELESTRAK_BASE_URL`, `SPACE_TRACK_USERNAME`, `SPACE_TRACK_PASSWORD`, `SQLITE_PATH`, `WEBSOCKET_PING_INTERVAL`, `TLE_REFRESH_INTERVAL`, `SCREENING_DISTANCE_KM`, `PC_ALERT_THRESHOLD`, `PC_SAFE_THRESHOLD`
 
-Test: `pytest test_*.py` (runs offline; Python 3.11+)
+Test: `pytest test_*.py` (runs offline; Python 3.11+; 33 tests passing, includes `test_content_review.py` for `backend/content_review.py`; needs `--asyncio-mode=auto`, e.g. `./.venv-audit/bin/python -m pytest test_*.py -q --asyncio-mode=auto`)
 
 If STATE.md exists in this root, read it first for current status.
