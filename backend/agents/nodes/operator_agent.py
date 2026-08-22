@@ -8,6 +8,7 @@ from datetime import datetime
 
 from backend.agents.state import AgentState
 from backend.api.schemas import WSMessage, WSMessageType
+from backend.content_review import review_negotiation_rationale
 from backend.db.store import insert_proposal
 from backend.orbital.conjunction import ManeuverInput, compute_minimum_delta_v
 
@@ -130,10 +131,16 @@ async def generate_operator_bid(state: AgentState) -> dict:
     winner_dv = winning_proposal["delta_v_ms"]
     loser_dv = loser_proposal["delta_v_ms"]
 
-    rationale = f"{winner} selected: \u0394V {winner_dv:.3f} m/s. Mission impact: LOW."
+    deterministic_rationale = f"{winner} selected: \u0394V {winner_dv:.3f} m/s. Mission impact: LOW."
     from backend.llm import groq_chat
     prompt = f"In one sentence, explain why {winner} was selected over {loser} for this maneuver. Delta-V values: {winner_dv:.3f} m/s vs {loser_dv:.3f} m/s."
-    rationale = await groq_chat(prompt) or rationale
+    llm_rationale = await groq_chat(prompt) or deterministic_rationale
+
+    review = review_negotiation_rationale(
+        llm_rationale, winner, loser, winner_dv, fallback_text=deterministic_rationale
+    )
+    rationale = review.reviewed_text
+    winning_proposal["rationale"] = rationale
 
     winner_msg = f"[COORDINATOR] Winner: {winner} \u2014 lowest cost maneuver selected"
     all_messages = bid_messages + [winner_msg]
@@ -155,6 +162,12 @@ async def generate_operator_bid(state: AgentState) -> dict:
         "[HITL] Proposal sent to human operator for approval",
         "[HITL] Awaiting decision \u2014 30 second timeout",
     ]
+    if review.passed:
+        hitl_messages.append("[CONTENT-REVIEW] pass")
+    else:
+        hitl_messages.append(
+            "[CONTENT-REVIEW] fallback used: " + "; ".join(review.reasons)
+        )
     ws_event_hitl = WSMessage.now(
         type_=WSMessageType.hitl_request,
         payload={

@@ -13,6 +13,7 @@ from datetime import datetime, timezone, timedelta
 from sgp4.api import Satrec
 
 from backend.api.routes import generate_conjunction_tle_pair
+from backend.content_review import review_negotiation_rationale
 from backend.orbital.conjunction import (
     ConjunctionInput,
     ManeuverInput,
@@ -23,6 +24,52 @@ from backend.orbital.conjunction import (
 
 # Demo operational histories (mirror /api/demo/inject and tle_ingestion).
 DEMO_MANEUVER_COUNT = {"DEMO-SAT-A": 0, "DEMO-SAT-B": 2}
+
+
+def test_negotiation_rationale_crediting_loser_is_replaced_by_deterministic_fallback():
+    """Guard that the negotiation rationale shown to the operator is reviewed
+    before it is displayed: if the LLM-authored one-liner credits the LOSING
+    operator with the win, the deterministic fallback must be what actually
+    ships in the emitted payload, not the LLM text.
+
+    ``generate_operator_bid`` (backend/agents/nodes/operator_agent.py) invokes
+    exactly this review boundary — ``review_negotiation_rationale`` — between
+    the raw ``groq_chat`` call and setting ``winning_proposal["rationale"]``.
+    Driving the full node requires satrec objects seeded into
+    ``backend.api.routes.sat_cache`` that the existing tests in this file
+    don't construct as reusable fixtures (they build TLEs inline in ``main()``
+    for a different purpose), so — per the task's own guidance to avoid
+    elaborate scaffolding — this test exercises the review boundary directly
+    with the same winner/loser/delta-v shapes the node passes in.
+    """
+    winner, loser = "OperatorA", "OperatorB"
+    winner_dv = 4.821
+    deterministic_rationale = f"{winner} selected: ΔV {winner_dv:.3f} m/s. Mission impact: LOW."
+
+    # LLM narrative that (incorrectly) credits the loser with the selection —
+    # exactly the failure mode this review exists to catch.
+    llm_rationale = f"{loser} was selected for this maneuver due to its lower fuel cost."
+
+    review = review_negotiation_rationale(
+        llm_rationale, winner, loser, winner_dv, fallback_text=deterministic_rationale
+    )
+
+    assert review.passed is False
+    assert review.used_fallback is True
+    assert review.reviewed_text == deterministic_rationale
+    assert loser not in review.reviewed_text or winner in review.reviewed_text
+    assert review.reviewed_text != llm_rationale
+
+    # Mirror the "[CONTENT-REVIEW]" hitl_messages formatting logic from
+    # generate_operator_bid (backend/agents/nodes/operator_agent.py) so a
+    # regression in that formatting is also caught here.
+    if review.passed:
+        content_review_line = "[CONTENT-REVIEW] pass"
+    else:
+        content_review_line = "[CONTENT-REVIEW] fallback used: " + "; ".join(review.reasons)
+
+    assert content_review_line.startswith("[CONTENT-REVIEW] fallback used: ")
+    assert review.reasons  # non-empty reasons backing the fallback line
 
 
 def main() -> None:

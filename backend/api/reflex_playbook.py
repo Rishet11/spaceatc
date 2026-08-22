@@ -15,7 +15,34 @@ Pure logic only (no OpenCV/torch imports) so it is unit-testable on its own.
 import json
 import logging
 
+from backend.content_review import review_reflex_narrative
+
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# DEMO SCAFFOLDING — force_bad_narrative
+# ---------------------------------------------------------------------------
+# These constants exist ONLY so a presenter can force the content readiness
+# review to reject a narrative live on stage (to show the amber "SAFE
+# FALLBACK" pill blocking something). They are never produced by the LLM or
+# the rule-based fallback, and are never used unless a caller explicitly
+# passes force_bad_narrative=True all the way down from the HTTP layer. The
+# narrative below is deliberately malformed for two REAL reasons that
+# review_reflex_narrative (backend/content_review.py) will genuinely reject:
+# it has no line starting with "Verdict:", and it names the "X" axis while
+# the accompanying (also hardcoded) dodge command reports axis "Z".
+_DEMO_BAD_NARRATIVE = [
+    "Target closing fast; priming reaction-control thrusters along the -X axis.",
+    "Command constraint validated successfully.",
+]
+_DEMO_BAD_DODGE_COMMAND = {
+    "intent": "EVADE",
+    "axis": "Z",
+    "delta_v_cm_s": 12,
+    "duration_ms": 400,
+    "reason": "demo_scaffolding_forced_rejection",
+    "post_evade_action": "schedule_correction_burn",
+}
 
 # ---------------------------------------------------------------------------
 # RAG corpus — onboard evasion playbook
@@ -185,22 +212,57 @@ def validate_dodge_command(cmd: dict | None) -> dict | None:
 # ---------------------------------------------------------------------------
 # Rule-based fallback (used when no API key or the LLM call fails)
 # ---------------------------------------------------------------------------
-def _fallback_decision(status: str, plays: list[dict]) -> dict:
+def _fallback_decision(
+    status: str, plays: list[dict], review_reasons: list[str] | None = None
+) -> dict:
+    content_review = {
+        "passed": False,
+        "used_fallback": True,
+        "reasons": review_reasons if review_reasons is not None else [],
+    }
     play = plays[0] if plays else None
     if status == "SCANNING":
         return {"reasoning": ["Verdict: No catalogued target in view. Continuing proximity scan."],
-                "dodge_command": None}
+                "dodge_command": None,
+                "content_review": content_review}
     if status == "MONITORING":
         return {"reasoning": ["Verdict: Trajectory nominal. No maneuver scheduled."],
-                "dodge_command": None}
+                "dodge_command": None,
+                "content_review": content_review}
     if status == "WARNING":
         return {"reasoning": ["Verdict: Target approaching danger zone. Priming reaction-control thrusters."],
-                "dodge_command": None}
+                "dodge_command": None,
+                "content_review": content_review}
     # CRITICAL
     cmd = validate_dodge_command(play["command"] if play else None)
     return {"reasoning": ["Executing Evasion Maneuver...",
                           "Command constraint validated successfully."],
-            "dodge_command": cmd}
+            "dodge_command": cmd,
+            "content_review": content_review}
+
+
+# ---------------------------------------------------------------------------
+# DEMO SCAFFOLDING — forced rejection path (see constants above)
+# ---------------------------------------------------------------------------
+def _demo_bad_decision(status: str, plays: list[dict]) -> dict:
+    """Run the real reviewer against the hardcoded bad narrative and assemble
+    the same shape reflex_decision would produce on a genuine review failure
+    (deterministic fallback content, real rejection reasons attached).
+
+    DEMO SCAFFOLDING — only reachable via force_bad_narrative=True, never
+    invoked in normal operation.
+    """
+    need_cmd = status == "CRITICAL"
+    review = review_reflex_narrative(
+        list(_DEMO_BAD_NARRATIVE), _DEMO_BAD_DODGE_COMMAND, status, need_cmd
+    )
+    result = _fallback_decision(status, plays, review_reasons=review.reasons)
+    result["content_review"] = {
+        "passed": review.passed,
+        "used_fallback": True,
+        "reasons": review.reasons,
+    }
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +271,7 @@ def _fallback_decision(status: str, plays: list[dict]) -> dict:
 async def _llm_reflex_decision(
     status: str, threat_level: str, detected: bool, distance_m: float,
     translation: list[float], plays: list[dict],
+    review_reasons: list[str] | None = None,
 ) -> dict | None:
     from backend.config import settings
     if not settings.groq_api_key:
@@ -253,7 +316,22 @@ async def _llm_reflex_decision(
         dodge = validate_dodge_command(data.get("dodge_command")) if need_cmd else None
         if need_cmd and dodge:
             reasoning.append("Command constraint validated successfully.")
-        return {"reasoning": reasoning, "dodge_command": dodge}
+
+        review = review_reflex_narrative(reasoning, dodge, status, need_cmd)
+        if not review.passed:
+            logger.warning(
+                "Reflex narrative failed content review for band %s: %s",
+                status, review.reasons,
+            )
+            if review_reasons is not None:
+                review_reasons.extend(review.reasons)
+            return None
+
+        return {
+            "reasoning": reasoning,
+            "dodge_command": dodge,
+            "content_review": {"passed": True, "used_fallback": False, "reasons": []},
+        }
     except Exception as e:  # noqa: BLE001 — any LLM failure falls back gracefully
         logger.error("Reflex LLM decision failed: %s", e)
         return None
@@ -265,22 +343,45 @@ async def _llm_reflex_decision(
 async def reflex_decision(
     status: str, threat_level: str, detected: bool, distance_m: float,
     translation: list[float], quaternion: list[float],
-) -> tuple[str, dict | None]:
-    """Return (decision_log, dodge_command) for the current frame.
+    force_bad_narrative: bool = False,
+) -> tuple[str, dict | None, dict]:
+    """Return (decision_log, dodge_command, content_review) for the current frame.
 
     The LLM narrative is generated once per threat band and cached; a fresh
     live telemetry header is prepended each frame so the displayed range stays
-    current without re-invoking the model.
+    current without re-invoking the model. Before the LLM's narrative is
+    cached (and therefore before it can be served on every subsequent frame
+    in that band) it must pass ``review_reflex_narrative``; a failed review
+    causes the LLM result to be discarded in favour of the deterministic
+    fallback, and the fallback is cached instead.
+
+    ``force_bad_narrative`` is DEMO SCAFFOLDING (default False): when True,
+    the hardcoded ``_DEMO_BAD_NARRATIVE`` is run through the real reviewer to
+    produce a genuine, on-stage rejection. This path deliberately bypasses
+    ``_DECISION_CACHE`` entirely (no read, no write) so a forced-bad request
+    can never contaminate what normal requests for this band see afterwards.
     """
     plays = retrieve_plays(detected, distance_m)
 
+    if force_bad_narrative:
+        decision = _demo_bad_decision(status, plays)
+        play_name = plays[0]["name"] if plays else "n/a"
+        header = [
+            f"Search Query: 'debris proximity / range {distance_m:.2f} m'",
+            f"Found Play: '{play_name}' (retrieved {len(plays)} of {TOTAL_PLAYS} plays)",
+        ]
+        decision_log = "\n".join(header + decision["reasoning"])
+        return decision_log, decision["dodge_command"], decision["content_review"]
+
     cached = _DECISION_CACHE.get(status)
     if cached is None:
+        review_reasons: list[str] = []
         cached = await _llm_reflex_decision(
-            status, threat_level, detected, distance_m, translation, plays
+            status, threat_level, detected, distance_m, translation, plays,
+            review_reasons=review_reasons,
         )
         if cached is None:
-            cached = _fallback_decision(status, plays)
+            cached = _fallback_decision(status, plays, review_reasons=review_reasons or None)
         _DECISION_CACHE[status] = cached
 
     play_name = plays[0]["name"] if plays else "n/a"
@@ -289,4 +390,7 @@ async def reflex_decision(
         f"Found Play: '{play_name}' (retrieved {len(plays)} of {TOTAL_PLAYS} plays)",
     ]
     decision_log = "\n".join(header + cached["reasoning"])
-    return decision_log, cached["dodge_command"]
+    content_review = cached.get(
+        "content_review", {"passed": True, "used_fallback": False, "reasons": []}
+    )
+    return decision_log, cached["dodge_command"], content_review

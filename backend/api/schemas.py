@@ -144,6 +144,9 @@ class ManeuverProposalResponse(BaseModel):
     bid_score: float = Field(
         description="Lower is better — combines delta_v + maneuver_count penalty"
     )
+    rationale: str = Field(
+        default="", description="Content-reviewed one-line explanation of the winning bid"
+    )
 
 
 # ---------------------------------------------------------------------------

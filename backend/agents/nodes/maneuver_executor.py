@@ -25,7 +25,7 @@ async def execute_maneuver(state: AgentState) -> dict:
     hitl_decision = state.get("hitl_decision")
     
     if not winning_proposal or hitl_decision != "approve":
-        msg = "[Executor] Maneuver execution skipped or vetoed."
+        msg = "[EXECUTOR] Maneuver execution skipped or vetoed."
         return {"phase": "resolved", "messages": state.get("messages", []) + [msg]}
         
     event_id = winning_proposal["event_id"]
