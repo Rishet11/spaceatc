@@ -383,7 +383,12 @@ export const ConjunctionPaths: React.FC = () => {
           />
         </>
       )}
-      {approved && safeArc && safeArc.length > 0 && exaggerationCaption && (
+      {/* Held back while decisionOutcome is up: OutcomeOverlay's centre banner
+          sits at roughly the same on-screen spot (CameraDirector keeps the
+          pair centred) for its ~3.6s window. This caption carries real info
+          (the exaggeration disclosure) so it still shows once the banner
+          clears, for the rest of DECISION_HOLD_MS. */}
+      {approved && safeArc && safeArc.length > 0 && exaggerationCaption && !decisionOutcome && (
         <Html position={safeArc[Math.floor(safeArc.length / 2)]} center zIndexRange={[5, 0]}>
           <div
             style={{

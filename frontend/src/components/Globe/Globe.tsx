@@ -46,6 +46,7 @@ function ConjunctionZone() {
   const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
   const satellites = useSpaceStore((s) => s.satellites);
   const resolvedEvent = useSpaceStore((s) => s.resolvedEvent);
+  const decisionOutcome = useSpaceStore((s) => s.decisionOutcome);
 
   // The REST poll's ConjunctionEvent.status doesn't always flip away from
   // 'detected' the instant a decision lands, which otherwise pinned this
@@ -187,7 +188,11 @@ function ConjunctionZone() {
         </Html>
       )}
 
-      {isResolving && (
+      {/* Suppressed while decisionOutcome is up: OutcomeOverlay's centre banner
+          already says COLLISION AVOIDED / MANEUVER EXECUTED with more detail,
+          stacked directly on top of this same midpoint. Showing both at once
+          is the "four layers stacked" bug; this one yields for its ~3.6s. */}
+      {isResolving && !decisionOutcome && (
         <Html position={midpoint} center zIndexRange={[10, 0]}>
           <div style={{
              fontSize: '2rem',

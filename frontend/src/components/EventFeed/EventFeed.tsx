@@ -47,11 +47,13 @@ function parseBadge(message: string): string {
   return 'SYSTEM';
 }
 
+// UTC, not local wall-clock: the header shows "SIM TIME ... UTC" so the log
+// must use the same clock or it reads as a second, disagreeing one.
 function formatTime(isoStr: string): string {
   try {
     const d = new Date(isoStr);
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
   } catch {
     return '--:--:--';
   }
