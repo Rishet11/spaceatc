@@ -76,9 +76,10 @@ export const EventFeed: React.FC = () => {
 
     [...eventFeed].reverse().forEach((ev) => {
       const messages: string[] = ev.payload?.messages ?? [];
-      // Use timestamp + type as the stable base — these won't shift when new
-      // events are prepended to the feed the way array indices do.
-      const base = `${ev.timestamp}::${ev.type}`;
+      // Keyed on the store's monotonic ingestion sequence. timestamp + type
+      // was not unique: the backend emits multiple negotiation_update events
+      // within the same millisecond, which collided and made React drop rows.
+      const base = `${ev.seq ?? ev.timestamp}::${ev.type}`;
 
       if (messages.length > 0) {
         messages.forEach((msg, mIdx) => {
@@ -106,7 +107,9 @@ export const EventFeed: React.FC = () => {
   // Auto-scroll to bottom on new entry
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logEntries.length]);
+    // Depend on the newest entry's id, not the array length: the list is
+    // capped at 50, so length stops changing and auto-scroll silently died.
+  }, [logEntries[logEntries.length - 1]?.id]);
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar font-mono">

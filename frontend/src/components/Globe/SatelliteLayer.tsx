@@ -51,17 +51,32 @@ export const SatelliteLayer: React.FC = () => {
   const tempColor = useMemo(() => new THREE.Color(), []);
 
   const trailsRef = useRef<Map<string, THREE.Vector3[]>>(new Map());
+  // The track the satellite flew BEFORE the burn. Kept so the judge can see
+  // what changed; previously the maneuver deleted exactly this history at the
+  // moment it became interesting.
+  const frozenTrailsRef = useRef<Map<string, THREE.Vector3[]>>(new Map());
   const [trailUpdate, setTrailUpdate] = React.useState(0);
 
   // Clear trail event listener
   React.useEffect(() => {
     const handler = (e: any) => {
-      trailsRef.current.delete(e.detail.name);
+      const name = e.detail.name;
+      const existing = trailsRef.current.get(name);
+      if (existing && existing.length > 1) {
+        frozenTrailsRef.current.set(name, existing.slice());
+      }
+      trailsRef.current.delete(name);
       setTrailUpdate(t => t + 1);
     };
     window.addEventListener('clear-trail', handler);
     return () => window.removeEventListener('clear-trail', handler);
   }, []);
+
+  // A fresh conjunction clears the previous encounter's frozen tracks.
+  React.useEffect(() => {
+    if (activeConjunctions.length === 0) return;
+    frozenTrailsRef.current.clear();
+  }, [activeConjunctions]);
 
   // Update trails when satellites change
   React.useEffect(() => {
@@ -82,7 +97,9 @@ export const SatelliteLayer: React.FC = () => {
       }
       if (trail.length === 0 || trail[trail.length - 1].distanceTo(pos) > 0.001) {
         trail.push(pos);
-        if (trail.length > 40) trail.shift();
+        // 40 points at one sample per broadcast spanned only ~5 deg of arc,
+        // which reads as a stub rather than an orbit.
+        if (trail.length > 400) trail.shift();
       }
     });
     setTrailUpdate(t => t + 1);
@@ -110,11 +127,13 @@ export const SatelliteLayer: React.FC = () => {
 
       const isHighlighted = highlightedSats.has(sat.name!);
       
-      // Scale: highlighted = 2×, DEMO = 1.5×, normal = 1×
-      const scale = isHighlighted
-        ? 2.0
+      // The conjunction pair has to be findable among ~200 other dots.
+      const isResolvedSat =
+        !!resolvedEvent && (sat.name === resolvedEvent.satA || sat.name === resolvedEvent.satB);
+      const scale = isHighlighted || isResolvedSat
+        ? 4.5
         : sat.name?.includes('DEMO')
-          ? 1.5
+          ? 2.0
           : 1.0;
       tempObject.scale.setScalar(scale);
       tempObject.updateMatrix();
@@ -128,9 +147,10 @@ export const SatelliteLayer: React.FC = () => {
       } else if (sat.name?.includes('DEMO')) {
         tempColor.set('#ffffff'); // white: demo
       } else if (sat.operator?.includes('SpaceX') || sat.operator?.includes('Starlink')) {
-        tempColor.set('#4fc3f7'); // blue: Starlink
+        // Desaturated so the highlighted pair reads first against the crowd.
+        tempColor.set('#3d6c88'); // muted blue: Starlink background
       } else {
-        tempColor.set('#ff9800'); // orange: others
+        tempColor.set('#8a6640'); // muted orange: other operators
       }
       mesh.setColorAt(i, tempColor);
 
@@ -165,6 +185,27 @@ export const SatelliteLayer: React.FC = () => {
         <meshBasicMaterial />
       </instancedMesh>
       
+      {/* Pre-maneuver track: the path the satellite WOULD have flown, kept on
+          screen next to the new one so the change is legible at a glance. */}
+      {Array.from(frozenTrailsRef.current.entries()).map(([name, trail]) => {
+        if (trail.length < 2) return null;
+        if (destroyedSatellites.includes(name)) return null;
+        return (
+          <Line
+            key={`frozen-${name}`}
+            points={trail}
+            color="#ef4444"
+            lineWidth={2}
+            transparent
+            opacity={0.5}
+            depthWrite={false}
+            dashed
+            dashSize={0.012}
+            gapSize={0.012}
+          />
+        );
+      })}
+
       {/* Render Trails */}
       {Array.from(trailsRef.current.entries()).map(([name, trail]) => {
         if (trail.length < 2) return null;
@@ -188,10 +229,13 @@ export const SatelliteLayer: React.FC = () => {
         }
         
         const colorObj = new THREE.Color(colorStr);
-        const black = new THREE.Color('#000000');
+        // Fade brightness, not toward black: under additive blending a black
+        // vertex contributes nothing, so the older half of every trail was
+        // rendering as literally invisible.
+        const dim = colorObj.clone().multiplyScalar(0.25);
         const vertexColors = trail.map((_, i) => {
-          const ratio = i / (trail.length - 1);
-          return black.clone().lerp(colorObj, ratio);
+          const ratio = trail.length > 1 ? i / (trail.length - 1) : 1;
+          return dim.clone().lerp(colorObj, ratio);
         });
 
         return (
@@ -199,10 +243,10 @@ export const SatelliteLayer: React.FC = () => {
             key={name}
             points={trail}
             vertexColors={vertexColors.map(c => [c.r, c.g, c.b])}
-            lineWidth={1.5}
+            lineWidth={3}
             blending={THREE.AdditiveBlending}
             transparent
-            opacity={0.8}
+            opacity={0.95}
             depthWrite={false}
             dashed={false}
           />

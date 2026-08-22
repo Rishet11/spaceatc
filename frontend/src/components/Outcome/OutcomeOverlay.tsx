@@ -2,14 +2,18 @@ import React, { useEffect } from 'react';
 import { useSpaceStore } from '../../store/useSpaceStore';
 import { ShieldCheck, AlertTriangle, ArrowRight } from 'lucide-react';
 
-// Estimate catastrophic-collision debris with the NASA Standard Breakup Model:
-// N(>Lc) = 0.1 * M^0.75 * Lc^-1.71, Lc = 0.05 m (5 cm catalog threshold), with
-// nominal Starlink-class mass (~250-340 kg each) varied per encounter so it
-// reads as a computed estimate, not a fixed prop number.
-const estimateDebris = (a: string, b: string): number => {
-  const seed = (a + b).split('').reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 100000, 7);
-  const massEach = 250 + (seed % 90);
-  const combinedMass = 2 * massEach;
+// Order-of-magnitude debris estimate from the NASA Standard Breakup Model:
+//   N(>Lc) = 0.1 * M^0.75 * Lc^-1.71,  Lc = 0.05 m (5 cm catalog threshold)
+//
+// The mass is a single stated assumption (Starlink v1.5 class, ~295 kg each),
+// NOT a per-encounter value. An earlier version hashed the two satellite names
+// to vary the mass so it would "read as a computed estimate" -- that is
+// fabricating precision the model does not have, so it has been removed. The
+// UI labels this as an assumption rather than a measurement.
+const STARLINK_CLASS_MASS_KG = 295;
+
+const estimateDebris = (): number => {
+  const combinedMass = 2 * STARLINK_CLASS_MASS_KG;
   const n = 0.1 * Math.pow(combinedMass, 0.75) * Math.pow(0.05, -1.71);
   return Math.round(n / 50) * 50;
 };
@@ -113,7 +117,12 @@ export const OutcomeOverlay: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <span className="text-gray-400 text-xs tracking-wider">EST. DEBRIS &gt;5CM</span>
-              <span className="font-bold text-orange-300">~{estimateDebris(satA, satB).toLocaleString()} fragments</span>
+              <span className="font-bold text-orange-300">
+                ~{estimateDebris().toLocaleString()} fragments
+              </span>
+              <span className="text-[9px] text-gray-500">
+                NASA SBM, {STARLINK_CLASS_MASS_KG} kg class assumed
+              </span>
             </div>
           </div>
         )}

@@ -291,18 +291,64 @@ export const ReflexPanel: React.FC = () => {
   // An uploaded off-domain clip detects nothing; show that as scanning, not broken.
   const noTarget = !!frameData && frameData.box === null;
 
-  const t = totalFrames > 1 ? currentFrame / (totalFrames - 1) : 0;
-  const satX = 50 + t * 900;
-  let satY = 88;
-  if (isEvading) {
-    if (satX >= 250 && satX <= 750) {
-      const dx = (satX - 250) / 500;
-      satY = 88 + Math.sin(dx * Math.PI) * 50;
-    }
-  }
+  // ---------------------------------------------------------------------
+  // Encounter schematic geometry.
+  //
+  // This used to be driven by position in the video clip (satX = 50 + t*900),
+  // which made the dodge unreachable: the swept range only crosses into
+  // CRITICAL at t > 0.795, putting satX above 766, while the offset branch
+  // required satX <= 750. The satellite therefore never left the centerline,
+  // and the drawn S-curve sat entirely behind it.
+  //
+  // Everything below is now derived from the MEASURED range, so the marker and
+  // the path are always consistent and the maneuver is visible exactly when the
+  // safety check actually fires.
+  // ---------------------------------------------------------------------
+  const SAFE_RANGE_M = 2.2;   // backend/api/reflex_playbook.py:76
+  const WARNING_RANGE_M = 1.5; // backend/api/reflex_playbook.py:77
+  const CLOSEST_RANGE_M = 0.6; // REPLAY_RANGE_NEAR_M
 
-  const debrisX = 350 + t * 200;
-  const debrisY = t * 176;
+  // How far through the approach we are (0 = first warning, 1 = closest point).
+  const approach = Math.max(
+    0,
+    Math.min(1, (SAFE_RANGE_M - distance) / (SAFE_RANGE_M - CLOSEST_RANGE_M))
+  );
+  // How committed the evasion is (0 at the CRITICAL threshold, 1 at closest).
+  const evadeAmount = Math.max(
+    0,
+    Math.min(1, (WARNING_RANGE_M - distance) / (WARNING_RANGE_M - CLOSEST_RANGE_M))
+  );
+
+  const MAX_OFFSET_PX = 52;
+  const satX = 50 + approach * 900;
+  // Negative = above the centerline, away from the debris crossing.
+  const offset = isEvading ? evadeAmount * MAX_OFFSET_PX : 0;
+  const satY = 88 - offset;
+
+  // x at which the evasion departs the nominal corridor (the CRITICAL crossing).
+  const critX =
+    50 + ((SAFE_RANGE_M - WARNING_RANGE_M) / (SAFE_RANGE_M - CLOSEST_RANGE_M)) * 900;
+
+  // The backend emits post_evade_action: 'schedule_correction_burn' on every
+  // burn. It was previously read by nothing; it drives the return leg here.
+  const willCorrect = cmd?.post_evade_action === 'schedule_correction_burn';
+
+  // Flown path: straight, then departing at critX toward the current offset.
+  const flownPath = isEvading
+    ? `M 0 88 L ${critX.toFixed(0)} 88 Q ${((critX + satX) / 2).toFixed(0)} ${(88 - offset * 1.25).toFixed(0)} ${satX.toFixed(0)} ${satY.toFixed(0)}`
+    : 'M 0 88 L 1000 88';
+
+  // Planned return to the nominal corridor after the encounter.
+  const correctionPath =
+    isEvading && willCorrect
+      ? `M ${satX.toFixed(0)} ${satY.toFixed(0)} Q ${((satX + 1000) / 2).toFixed(0)} ${(88 - offset * 1.25).toFixed(0)} 1000 88`
+      : null;
+
+  // Debris closes on the corridor and crosses it at the point of closest
+  // approach, so the near-miss happens where the satellite has stepped aside.
+  const debrisX = 90 + approach * 900;
+  // Keep the marker exactly on its drawn crossing line (M 0 0 L 1000 176).
+  const debrisY = (debrisX / 1000) * 176;
 
   return (
     <div className="w-full h-full grid grid-cols-12 gap-6 p-6 overflow-y-auto bg-[#070a13] font-sans text-gray-200">
@@ -320,8 +366,12 @@ export const ReflexPanel: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center space-x-4 text-[10px] font-mono text-gray-500">
-            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span>SAFE (&gt;1.5 m)</span></span>
-            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /><span>WARNING</span></span>
+            {/* Bands must match backend/api/reflex_playbook.py:76-77 —
+                SAFE_RANGE_M = 2.2, WARNING_RANGE_M = 1.5. The legend
+                previously claimed SAFE was anything above 1.5 m, which
+                contradicted the amber chip sitting next to it. */}
+            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span>SAFE (&gt;2.2 m)</span></span>
+            <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /><span>WARNING (1.5&ndash;2.2 m)</span></span>
             <span className="flex items-center space-x-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /><span>EVASION (&lt;1.5 m)</span></span>
           </div>
         </div>
@@ -807,25 +857,48 @@ export const ReflexPanel: React.FC = () => {
 
           {/* Satellite Trajectory Line */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 1000 176" preserveAspectRatio="none">
-            {/* Evasion deviation curve */}
+            {/* Nominal corridor the satellite would have flown */}
+            {isEvading && (
+              <path
+                d="M 0 88 L 1000 88"
+                fill="none"
+                stroke="#64748b"
+                strokeWidth="1.5"
+                strokeDasharray="4, 6"
+                opacity="0.5"
+              />
+            )}
+
+            {/* Actually-flown path, driven by the measured range */}
             <path
-              d={isEvading 
-                ? "M 0 88 L 250 88 C 350 88, 400 138, 500 138 C 600 138, 650 88, 750 88 L 1000 88" 
-                : "M 0 88 L 1000 88"}
+              d={flownPath}
               fill="none"
               stroke="#10b981"
-              strokeWidth="2"
+              strokeWidth="2.5"
               strokeDasharray={isEvading ? "0" : "5, 5"}
-              className="transition-all duration-300"
             />
-            
+
+            {/* Scheduled correction burn back to the nominal corridor.
+                Driven by the real post_evade_action field. */}
+            {correctionPath && (
+              <path
+                d={correctionPath}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="2"
+                strokeDasharray="6, 5"
+                opacity="0.55"
+              />
+            )}
+
             {/* Debris Crossing Line */}
             <path
-              d="M 350 0 L 550 176"
+              d="M 0 0 L 1000 176"
               fill="none"
               stroke="#ef4444"
               strokeWidth="2.5"
               strokeDasharray="4, 4"
+              opacity="0.7"
             />
           </svg>
 
@@ -879,7 +952,8 @@ export const ReflexPanel: React.FC = () => {
           {/* Action Callout */}
           {isEvading && (
             <div className="absolute bottom-2 right-4 bg-red-950/30 border border-red-500/40 px-3 py-1 rounded text-[10px] font-mono text-red-400 tracking-wider">
-              THRUST ACTION AXIS-Y (+50m CORRIDOR BIAS)
+              CROSS-TRACK BURN · {cmd?.axis ? `${cmd.axis}-AXIS` : 'Y-AXIS'}
+              {cmd?.delta_v_cm_s !== undefined ? ` · ${cmd.delta_v_cm_s} cm/s` : ''}
             </div>
           )}
         </div>

@@ -19,6 +19,8 @@ export const Legend: React.FC = () => (
         </div>
       ))}
     </div>
-    <div className="text-[9px] text-gray-600 mt-1.5 italic">paths exaggerated for clarity</div>
+    <div className="text-[9px] text-gray-500 mt-1.5">
+      orbit tracks: SGP4-propagated from live TLEs
+    </div>
   </div>
 );

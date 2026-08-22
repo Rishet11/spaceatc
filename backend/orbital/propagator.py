@@ -136,17 +136,22 @@ def _gmst_rad(dt: datetime) -> float:
     # Julian centuries from J2000.0
     t = ((jd - _J2000_JD) + fr) / 36525.0
 
-    # GMST in seconds of arc (polynomial from Vallado, "Fundamentals of Astrodynamics")
-    theta_arcsec = (
+    # GMST in SECONDS OF TIME (polynomial from Vallado, "Fundamentals of
+    # Astrodynamics"). Note the unit: this is seconds of time, not arcseconds.
+    # The 876600.0 * 3600.0 term is 876600 hours expressed in seconds.
+    theta_sec = (
         67310.54841
         + (876600.0 * 3600.0 + 8640184.812866) * t
         + 0.093104 * t * t
         - 6.2e-6 * t * t * t
     )
 
-    # Convert arcseconds → radians and normalise to [0, 2π)
-    theta_rad = math.radians(theta_arcsec / 3600.0) % (2.0 * math.pi)
-    return theta_rad
+    # Seconds of time → degrees: a full 360 deg turn takes 86400 s, so divide
+    # by 240. (Dividing by 3600 would treat the value as arcseconds and yield
+    # exactly 1/15 of the true angle, making the Earth appear to rotate once
+    # per ~15 days and putting every sub-satellite longitude in the wrong place.)
+    theta_deg = (theta_sec / 240.0) % 360.0
+    return math.radians(theta_deg)
 
 
 def _ecef_to_geodetic(

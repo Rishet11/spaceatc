@@ -19,10 +19,17 @@ export interface ConjunctionEvent {
   event_id: string;
   sat_primary: string;
   sat_secondary: string;
-  operator_primary: string;
-  operator_secondary: string;
+  // NOTE: verified against the live API — GET /api/conjunctions returns
+  // sat_primary, sat_secondary, operator-less rows plus session_id. The
+  // operator_* and tca_iso fields are declared by ConjunctionEventResponse in
+  // backend/api/schemas.py but the route does not serialize through it, so
+  // they are absent at runtime. Marked optional so the compiler forces a
+  // null-check instead of letting `undefined` reach the DOM.
+  operator_primary?: string;
+  operator_secondary?: string;
+  session_id?: string;
   tca: string;
-  tca_iso: string;
+  tca_iso?: string;
   miss_distance_km: number;
   pc: number;
   relative_velocity_km_s: number;
@@ -114,8 +121,14 @@ export interface WSMessageSystemStatus extends WSMessageBase {
   };
 }
 
+export interface WSMessageMetricsUpdate extends WSMessageBase {
+  type: 'metrics_update';
+  payload: Metrics;
+}
+
 export type WSMessage =
   | WSMessageSatelliteUpdate
+  | WSMessageMetricsUpdate
   | WSMessageConjunctionDetected
   | WSMessageNegotiationUpdate
   | WSMessageHitlRequest
@@ -126,6 +139,13 @@ export interface EventLogItem {
   timestamp: string;
   type: string;
   payload: any;
+  /**
+   * Monotonic ingestion sequence, assigned by the store. The feed previously
+   * keyed rows on `timestamp::type`, but the backend emits several
+   * negotiation_update events inside the same millisecond, so those keys
+   * collided and React dropped rows.
+   */
+  seq?: number;
 }
 
 export interface DecisionOutcome {
@@ -154,4 +174,44 @@ export interface ManeuverBid {
   operator: string;
   delta_v_ms: number;
   bid_score: number;
+}
+
+/**
+ * Real before/after numbers broadcast on `maneuver_executed`.
+ * Source: backend/agents/nodes/maneuver_executor.py — these are computed by the
+ * backend, never synthesized here. Used to render the resolution summary.
+ */
+export interface ManeuverResult {
+  event_id: string;
+  satellite_name: string;
+  operator: string;
+  delta_v_ms: number;
+  pc_before: number;
+  pc_after: number;
+  miss_km_before: number;
+  miss_km_after: number;
+  burn_time: string;
+}
+
+/**
+ * Judge-readable summary of an approved maneuver.
+ *
+ * Every field here is a real value taken from the winning proposal and the
+ * detected conjunction — nothing is synthesized in the frontend. `trace` keeps
+ * the full derivation available behind a disclosure so the "we really computed
+ * this" evidence is not lost, without dumping 25 binary-search rows on screen.
+ */
+export interface ManeuverSummary {
+  eventId: string;
+  satelliteName: string;
+  operator: string;
+  deltaV: number;
+  burnDirection: string;
+  burnTime: string;
+  missBeforeKm: number | null;
+  missAfterKm: number;
+  pcBefore: number | null;
+  pcAfter: number;
+  fuelCostUnits: number | null;
+  trace: any[];
 }

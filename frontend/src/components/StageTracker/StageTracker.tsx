@@ -23,7 +23,14 @@ const CAPTIONS: Record<PipelineStage, string> = {
 };
 
 function useStage(): PipelineStage {
-  const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
+  // The stage is now driven explicitly from the WebSocket stream
+  // (see useWebSocket.ts). The previous implementation derived it from
+  // ConjunctionEvent.status, but the backend never writes 'negotiating' or
+  // 'pending_hitl' to the DB — only 'detected', 'pending_execution', 'vetoed'
+  // and 'resolved' — so the NEGOTIATE step was unreachable. The terminal
+  // decision states still win, so the tracker never regresses to idle after a
+  // decision has been made.
+  const pipelineStage = useSpaceStore((s) => s.pipelineStage);
   const currentHitlRequest = useSpaceStore((s) => s.currentHitlRequest);
   const decisionOutcome = useSpaceStore((s) => s.decisionOutcome);
   const resolvedEvent = useSpaceStore((s) => s.resolvedEvent);
@@ -31,18 +38,7 @@ function useStage(): PipelineStage {
   if (decisionOutcome?.decision === 'veto') return 'collision';
   if (decisionOutcome?.decision === 'approve' || resolvedEvent) return 'resolved';
   if (currentHitlRequest) return 'awaiting';
-  const active = activeConjunctions.find(
-    (c) =>
-      c.status === 'detected' ||
-      c.status === 'negotiating' ||
-      c.status === 'pending_hitl'
-  );
-  if (active) {
-    if (active.status === 'negotiating') return 'negotiating';
-    if (active.status === 'pending_hitl') return 'awaiting';
-    return 'detected';
-  }
-  return 'idle';
+  return pipelineStage;
 }
 
 export const StageTracker: React.FC = () => {
@@ -70,7 +66,7 @@ export const StageTracker: React.FC = () => {
 
             let textColor = 'text-gray-600';
             if (isLast && current)
-              textColor = stage === 'collision' ? 'text-red-400' : 'text-green-400';
+              textColor = stage === 'collision' ? 'text-red-300' : 'text-green-300';
             else if (current) textColor = 'text-white';
             else if (done) textColor = 'text-gray-300';
 
@@ -80,19 +76,42 @@ export const StageTracker: React.FC = () => {
                 ? stage === 'collision'
                   ? 'bg-red-500'
                   : 'bg-green-500'
-                : 'bg-white';
+                : 'bg-cyan-400';
             else if (done) dot = 'bg-gray-400';
+
+            // The active step reads as a filled pill with a pulsing ring so the
+            // transition is legible from across a room, not an 8px dot swap.
+            const pillRing = isLast
+              ? stage === 'collision'
+                ? 'bg-red-500/15 ring-1 ring-red-400/70'
+                : 'bg-green-500/15 ring-1 ring-green-400/70'
+              : 'bg-cyan-400/15 ring-1 ring-cyan-300/70';
 
             return (
               <React.Fragment key={label}>
-                <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${dot}`} />
+                <div
+                  className={`flex items-center gap-2 rounded-full px-2.5 py-1 transition-all duration-300 ${
+                    current ? pillRing : ''
+                  }`}
+                >
+                  <span className="relative flex h-2.5 w-2.5">
+                    {current && (
+                      <span
+                        className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dot}`}
+                      />
+                    )}
+                    <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dot}`} />
+                  </span>
                   <span className={`text-[11px] font-bold tracking-widest ${textColor}`}>
                     {lbl}
                   </span>
                 </div>
                 {!isLast && (
-                  <div className={`flex-1 h-px mx-2 ${done ? 'bg-gray-500' : 'bg-gray-800'}`} />
+                  <div
+                    className={`flex-1 h-0.5 mx-2 rounded transition-colors duration-300 ${
+                      done ? 'bg-cyan-500/60' : 'bg-gray-800'
+                    }`}
+                  />
                 )}
               </React.Fragment>
             );

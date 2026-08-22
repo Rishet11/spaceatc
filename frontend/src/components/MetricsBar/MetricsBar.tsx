@@ -127,7 +127,10 @@ export const MetricsBar: React.FC = () => {
             <Tooltip text="Total fuel burned across all maneuvers. 0.1 m/s ≈ the speed of a slow walk — a tiny nudge that prevents catastrophic collision." position="bottom">
               <span>Total ΔV:</span>
             </Tooltip>
-            <strong className="text-white">{((metrics as any).total_delta_v_ms / 1000).toFixed(3)} m/s</strong>
+            {/* total_delta_v_ms is already in m/s end to end (conjunction.py
+                converts km/s -> m/s once). The previous /1000 divided it a
+                second time, pinning this headline metric at 0.000. */}
+            <strong className="text-white">{metrics.total_delta_v_ms.toFixed(3)} m/s</strong>
           </div>
           <div className="text-gray-600">|</div>
           <div className="flex items-center space-x-2">

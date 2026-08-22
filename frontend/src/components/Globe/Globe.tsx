@@ -181,7 +181,11 @@ function ConjunctionZone() {
               boxShadow: '0 0 12px rgba(239,68,68,0.5)',
             }}
           >
-            {(dist * 6371).toFixed(1)} km · COLLISION COURSE
+            {/* This label used to show the CURRENT separation next to the
+                words "COLLISION COURSE", which reads as several thousand km
+                well before TCA. The miss distance at closest approach is the
+                number that actually matters, and the backend already sends it. */}
+            {activePair.miss_distance_km.toFixed(3)} km MISS AT TCA
           </div>
         </Html>
       )}

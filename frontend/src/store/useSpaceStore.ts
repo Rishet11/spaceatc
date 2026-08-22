@@ -6,7 +6,10 @@ import {
   Metrics,
   EventLogItem,
   DecisionOutcome,
-  ManeuverBid
+  ManeuverBid,
+  ManeuverResult,
+  ManeuverSummary,
+  PipelineStage
 } from '../types';
 
 export type ToastLevel = 'info' | 'error' | 'success';
@@ -24,6 +27,18 @@ export interface SpaceState {
   resolvedEvent: { satA: string; satB: string; timestamp: number } | null;
   decisionOutcome: DecisionOutcome | null;
   negotiationBids: ManeuverBid[] | null;
+  /**
+   * Explicit pipeline stage, driven synchronously from the WebSocket stream.
+   * Previously the stage was derived from ConjunctionEvent.status, but the
+   * backend only ever writes 'detected' | 'pending_execution' | 'vetoed' |
+   * 'resolved' — never 'negotiating' — so the NEGOTIATE step could never light
+   * up. Driving it from the message stream makes every stage reachable.
+   */
+  pipelineStage: PipelineStage;
+  /** Real before/after numbers from the backend's maneuver_executed event. */
+  maneuverResult: ManeuverResult | null;
+  /** Judge-readable approved-maneuver summary (replaces the raw trace dump). */
+  maneuverSummary: ManeuverSummary | null;
   metrics: Metrics;
   eventFeed: EventLogItem[];
 
@@ -55,6 +70,9 @@ export interface SpaceState {
   setResolvedEvent: (event: { satA: string; satB: string; timestamp: number } | null) => void;
   setDecisionOutcome: (outcome: DecisionOutcome | null) => void;
   setNegotiationBids: (bids: ManeuverBid[] | null) => void;
+  setPipelineStage: (stage: PipelineStage) => void;
+  setManeuverResult: (result: ManeuverResult | null) => void;
+  setManeuverSummary: (summary: ManeuverSummary | null) => void;
   clearConjunctionVisuals: () => void;
   resetForNewConjunction: () => void;
   activeTab: 'ground' | 'reflex';
@@ -65,6 +83,9 @@ export interface SpaceState {
   dismissToast: (id: string) => void;
 }
 
+// Monotonic counter for feed entries; see EventLogItem.seq.
+let feedSeq = 0;
+
 export const useSpaceStore = create<SpaceState>((set) => ({
   satellites: {},
   activeConjunctions: [],
@@ -73,6 +94,9 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   resolvedEvent: null,
   decisionOutcome: null,
   negotiationBids: null,
+  pipelineStage: 'idle',
+  maneuverResult: null,
+  maneuverSummary: null,
   eventFeed: [],
   destroyedSatellites: [],
   trailClearedCount: 0,
@@ -94,7 +118,9 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   maneuversExecuted: 0,
   totalDeltaV: 0,
 
-  simSpeed: 60,
+  // Matches the backend default (backend/main.py SIM_SPEED = 1.0). This was
+  // 60, so the speed selector briefly showed 60x before the first WS frame.
+  simSpeed: 1,
   simTime: '',
 
   wsConnected: false,
@@ -114,7 +140,7 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   }),
 
   addFeedEvent: (event) => set((state) => ({
-    eventFeed: [event, ...state.eventFeed].slice(0, 100)
+    eventFeed: [{ ...event, seq: feedSeq++ }, ...state.eventFeed].slice(0, 100)
   })),
 
   setHitlRequest: (req) => set({ currentHitlRequest: req }),
@@ -138,12 +164,18 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   setResolvedEvent: (event) => set({ resolvedEvent: event }),
   setDecisionOutcome: (outcome) => set({ decisionOutcome: outcome }),
   setNegotiationBids: (bids) => set({ negotiationBids: bids }),
+  setPipelineStage: (stage) => set({ pipelineStage: stage }),
+  setManeuverResult: (result) => set({ maneuverResult: result }),
+  setManeuverSummary: (summary) => set({ maneuverSummary: summary }),
   clearConjunctionVisuals: () => set({ resolvedEvent: null, negotiationBids: null }),
   resetForNewConjunction: () => set({
     destroyedSatellites: [],
     resolvedEvent: null,
     decisionOutcome: null,
     negotiationBids: null,
+    maneuverResult: null,
+    maneuverSummary: null,
+    pipelineStage: 'detected',
   }),
   activeTab: 'ground',
   setActiveTab: (tab) => set({ activeTab: tab }),
