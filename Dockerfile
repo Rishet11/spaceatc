@@ -5,6 +5,10 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
+# Vite inlines VITE_* at build time, so this has to be a build arg -- setting it
+# as a runtime variable on the host would be silently ignored.
+ARG VITE_HITL_TIMEOUT_S=60
+ENV VITE_HITL_TIMEOUT_S=$VITE_HITL_TIMEOUT_S
 RUN npm run build          # -> /fe/dist
 
 # ---- Stage 2: Python backend + ML + serve the built SPA ----

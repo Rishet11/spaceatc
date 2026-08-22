@@ -12,7 +12,7 @@ import { Tooltip } from '../Tooltip';
 // and a review window that expires mid-sentence would veto a maneuver the
 // operator was in the middle of approving. Whatever value is set here is the
 // value shown on screen and the value we quote.
-const REVIEW_WINDOW_S = Number(import.meta.env.VITE_HITL_TIMEOUT_S ?? 30);
+const REVIEW_WINDOW_S = Number(import.meta.env.VITE_HITL_TIMEOUT_S ?? 60);
 
 export const HITLPanel: React.FC = () => {
   const {
