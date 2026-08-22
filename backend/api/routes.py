@@ -303,11 +303,15 @@ async def _post_maneuver_track(event_id, offsets, tca, find_satrec):
 async def get_metrics():
     import aiosqlite
     from backend.config import settings
+
+    # Active satellites: count of what's actually cached and propagated (and
+    # therefore what a judge sees moving on the globe), not a raw row count
+    # from the satellites table. Ingestion nodes can upsert catalog rows that
+    # never make it into sat_cache, which would otherwise let this headline
+    # number diverge from the "Active Satellites" a viewer can see on screen.
+    active_sats = len(sat_cache)
+
     async with aiosqlite.connect(settings.sqlite_path) as db:
-        # Active satellites: count from DB
-        async with db.execute("SELECT COUNT(*) FROM satellites") as c:
-            active_sats = (await c.fetchone())[0]
-        
         # Total conjunctions detected ever
         async with db.execute("SELECT COUNT(*) FROM conjunctions") as c:
             total_conjunctions = (await c.fetchone())[0]
@@ -352,6 +356,22 @@ async def get_metrics():
             "system_status": "ACTIVE"
         }
 
+async def reset_session_tables(db) -> None:
+    """Clear per-session demo state: conjunctions, proposals, and LangGraph
+    checkpoints. Leaves the satellites table (the tracked constellation
+    catalog) untouched -- that's not session data, it's what's on the globe.
+
+    Shared by the manual /api/demo/reset endpoint and by the startup
+    lifespan, so a fresh backend process never inherits a previous run's
+    counters or an orphaned pending_hitl conjunction.
+    """
+    await db.execute("DELETE FROM conjunctions")
+    await db.execute("DELETE FROM proposals")
+    await db.execute("DELETE FROM checkpoints")
+    await db.execute("DELETE FROM writes")
+    await db.commit()
+
+
 @router.post("/api/demo/reset")
 async def demo_reset():
     import aiosqlite
@@ -367,11 +387,7 @@ async def demo_reset():
                 status_code=409,
                 detail="Cannot reset while a conjunction is awaiting human approval",
             )
-        await db.execute("DELETE FROM conjunctions")
-        await db.execute("DELETE FROM proposals")
-        await db.execute("DELETE FROM checkpoints")
-        await db.execute("DELETE FROM writes")
-        await db.commit()
+        await reset_session_tables(db)
     return {"status": "reset"}
 
 def generate_conjunction_tle_pair(epoch_dt: datetime) -> tuple[tuple[str, str, str], tuple[str, str, str]]:

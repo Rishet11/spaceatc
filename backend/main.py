@@ -223,6 +223,17 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing DB...")
     await init_db()
 
+    # Clear prior-session demo state (conjunctions/proposals/checkpoints) so a
+    # fresh backend process never shows a judge counters or a stuck
+    # pending-approval conjunction left over from an earlier run. The
+    # satellite catalog is untouched -- it's re-derived below regardless.
+    import aiosqlite
+    from backend.config import settings
+    from backend.api.routes import reset_session_tables
+    async with aiosqlite.connect(settings.sqlite_path) as db:
+        await reset_session_tables(db)
+    logger.info("Cleared prior-session conjunction/proposal state for a clean session boundary.")
+
     # Load satellites in the background so the server binds its port within
     # seconds. The ML import is already deferred; this removes the last blocking
     # startup step (a network fetch that times out on egress-restricted hosts),
