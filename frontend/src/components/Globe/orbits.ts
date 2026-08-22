@@ -94,6 +94,29 @@ export function getOrbitRingPoints(
   return pts;
 }
 
+/**
+ * Rotates `from` toward `to` along the great-circle arc through both, by
+ * `progress` of the angle between them (progress > 1 continues past `to` at
+ * the same angular rate). Used to advance a satellite's on-screen position
+ * smoothly between backend position ticks, and to extrapolate past the most
+ * recent one, instead of snapping the dot from tick to tick. A straight
+ * Cartesian lerp would cut a chord across the orbit instead of following its
+ * curvature, which is only visible as an issue at low tick rates or high sim
+ * speed multipliers where the per-tick angular step is large.
+ */
+export function advancePosition(
+  from: THREE.Vector3,
+  to: THREE.Vector3,
+  progress: number
+): THREE.Vector3 {
+  const r = from.length();
+  const axis = from.clone().cross(to);
+  if (axis.lengthSq() < 1e-10) return from.clone();
+  axis.normalize();
+  const angle = from.angleTo(to);
+  return from.clone().applyAxisAngle(axis, angle * progress).setLength(r);
+}
+
 export function closestApproachIndex(a: THREE.Vector3[], b: THREE.Vector3[]): number {
   const len = Math.min(a.length, b.length);
   let best = 0;

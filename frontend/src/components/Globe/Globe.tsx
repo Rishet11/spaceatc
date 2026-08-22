@@ -218,17 +218,12 @@ function ConjunctionZone() {
 
 // Globe — main component
 export const Globe: React.FC = () => {
-  const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
-  const decisionOutcome = useSpaceStore((s) => s.decisionOutcome);
+  const pipelineStage = useSpaceStore((s) => s.pipelineStage);
 
-  const eventActive =
-    !!decisionOutcome ||
-    activeConjunctions.some(
-      (c) =>
-        c.status === 'detected' ||
-        c.status === 'negotiating' ||
-        c.status === 'pending_hitl'
-    );
+  // Rotation is only held still while the camera is actively framing a
+  // conjunction for a decision ('awaiting'); a resolved/collided event
+  // hanging around in the store must not freeze the globe forever.
+  const eventActive = pipelineStage === 'awaiting';
 
   const controlsRef = useRef<any>(null);
 
