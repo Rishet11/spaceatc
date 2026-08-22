@@ -243,6 +243,12 @@ export const HITLPanel: React.FC = () => {
               {proposal.post_maneuver_miss_km.toFixed(3)} km
             </span>
           </div>
+          {proposal.rationale && (
+            <div className="flex justify-between">
+              <span className="text-gray-400 shrink-0 mr-3">AI RATIONALE:</span>
+              <span className="text-xs text-gray-500 text-right">{proposal.rationale}</span>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Risk Comparison */}

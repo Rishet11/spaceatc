@@ -51,6 +51,7 @@ export interface ManeuverProposal {
   fuel_cost_units: number;
   bid_score: number;
   computation_trace?: string[];
+  rationale?: string;
 }
 
 export interface Metrics {

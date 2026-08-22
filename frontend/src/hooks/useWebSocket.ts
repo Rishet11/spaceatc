@@ -96,8 +96,11 @@ export const useWebSocket = () => {
               addFeedEvent(msg);
               // resetForNewConjunction sets the stage to 'detected' synchronously,
               // so the stepper advances the instant the message lands rather than
-              // waiting for the /api/conjunctions round-trip below.
-              resetForNewConjunction();
+              // waiting for the /api/conjunctions round-trip below. It also records
+              // this event as the active one, so a maneuver_executed that arrives
+              // late for a superseded conjunction (see the guard below) can be told
+              // apart from one for the conjunction actually on screen.
+              resetForNewConjunction(msg.payload.event_id);
               fetch('/api/conjunctions')
                 .then(res => res.json())
                 .then(data => setActiveConjunctions(data))
@@ -122,6 +125,27 @@ export const useWebSocket = () => {
 
             case 'maneuver_executed': {
               addFeedEvent(msg);
+
+              // The maneuver executor sleeps ~3.5s before emitting this event, so
+              // it can arrive after a *later* conjunction has already been
+              // detected (and is now awaiting its own decision). Applying this
+              // message's 'resolved' state in that case would stomp the stage
+              // tracker and resolvedEvent for the conjunction actually on
+              // screen. Guard on event_id; if it's absent, fail open and apply
+              // the update rather than silently drop a legitimate result.
+              const p = msg.payload as any;
+              const activeEventId = useSpaceStore.getState().currentEventId;
+              const isStale = p.event_id != null && activeEventId != null && p.event_id !== activeEventId;
+
+              if (isStale) {
+                fetch('/api/conjunctions')
+                  .then(res => res.json())
+                  .then(data => setActiveConjunctions(data))
+                  .catch(() => { /* metrics refresh below still runs */ });
+                refreshMetrics();
+                break;
+              }
+
               setActiveMathTrace(null);
               setPipelineStage('resolved');
               clearTrail(msg.payload.satellite_name);
@@ -129,7 +153,6 @@ export const useWebSocket = () => {
               // The backend already computes the real before/after figures.
               // Keep them so the UI can show measured values instead of the
               // frontend's optimistic pre-decision estimates.
-              const p = msg.payload as any;
               setManeuverResult({
                 event_id: p.event_id,
                 satellite_name: p.satellite_name,

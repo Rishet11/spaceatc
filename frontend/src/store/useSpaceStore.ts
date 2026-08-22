@@ -23,6 +23,14 @@ export interface SpaceState {
   satellites: Record<string, Satellite>;
   activeConjunctions: ConjunctionEvent[];
   currentHitlRequest: WSMessageHitlRequest | null;
+  /**
+   * event_id of the conjunction currently being worked (set synchronously by
+   * resetForNewConjunction, which the conjunction_detected handler calls).
+   * Lets late-arriving messages for a superseded conjunction (e.g. a
+   * maneuver_executed delayed behind the executor's sleep) be told apart
+   * from messages for the one actually on screen.
+   */
+  currentEventId: string | null;
   activeMathTrace: any[] | null;
   resolvedEvent: { satA: string; satB: string; timestamp: number } | null;
   decisionOutcome: DecisionOutcome | null;
@@ -74,7 +82,7 @@ export interface SpaceState {
   setManeuverResult: (result: ManeuverResult | null) => void;
   setManeuverSummary: (summary: ManeuverSummary | null) => void;
   clearConjunctionVisuals: () => void;
-  resetForNewConjunction: () => void;
+  resetForNewConjunction: (eventId?: string) => void;
   activeTab: 'ground' | 'reflex';
   setActiveTab: (tab: 'ground' | 'reflex') => void;
 
@@ -90,6 +98,7 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   satellites: {},
   activeConjunctions: [],
   currentHitlRequest: null,
+  currentEventId: null,
   activeMathTrace: null,
   resolvedEvent: null,
   decisionOutcome: null,
@@ -168,7 +177,7 @@ export const useSpaceStore = create<SpaceState>((set) => ({
   setManeuverResult: (result) => set({ maneuverResult: result }),
   setManeuverSummary: (summary) => set({ maneuverSummary: summary }),
   clearConjunctionVisuals: () => set({ resolvedEvent: null, negotiationBids: null }),
-  resetForNewConjunction: () => set({
+  resetForNewConjunction: (eventId) => set({
     destroyedSatellites: [],
     resolvedEvent: null,
     decisionOutcome: null,
@@ -176,6 +185,7 @@ export const useSpaceStore = create<SpaceState>((set) => ({
     maneuverResult: null,
     maneuverSummary: null,
     pipelineStage: 'detected',
+    currentEventId: eventId ?? null,
   }),
   activeTab: 'ground',
   setActiveTab: (tab) => set({ activeTab: tab }),

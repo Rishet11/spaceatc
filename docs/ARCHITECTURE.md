@@ -24,6 +24,9 @@ a UI.
                           │   generate_bids  ── Operator A agent ──┐      │
                           │                  ── Operator B agent ──┤      │
                           │        ▼            winner = min(score) │     │
+                          │   review_negotiation_rationale (content  │     │
+                          │        review, fail → deterministic text)│     │
+                          │        ▼                                 │     │
                           │   await_hitl  ◄── interrupt_before ─────┘     │
                           │        │ (human APPROVE / VETO via REST)      │
                           │        ▼                                      │
@@ -33,7 +36,10 @@ a UI.
    fully autonomous       │   YOLO26 detect → MobileNetV3 6-DOF pose →    │
                           │   classify_threat (deterministic) →           │
                           │   retrieve_plays (RAG) → LLM reason →          │
-                          │   validate_dodge_command (safety guardrail)   │
+                          │   validate_dodge_command (safety guardrail) → │
+                          │   review_reflex_narrative (content review,    │
+                          │   fail → deterministic fallback) → per-band   │
+                          │   cache                                       │
                           └───────────────────────────────────────────────┘
             tools: CelesTrak TLEs (httpx) · SGP4 (sgp4) · Clohessy–Wiltshire · PyTorch/OpenCV
 ```
@@ -48,7 +54,7 @@ checkpointer and `interrupt_before=["await_hitl"]`. Nodes:
 | `ingest_tle` | `nodes/tle_ingestion.py` | Pulls live Starlink TLEs from CelesTrak (httpx), bounded-timeout fallback to a 100-sat local cache. |
 | `detect_conjunctions` | `nodes/conjunction_detector.py` | Screens cross-operator pairs with a real **SGP4 coarse scan + SciPy TCA refinement** (`orbital/conjunction.py:find_tca`); raises an event when **Pc > 1e-4** (industry alert threshold). |
 | `coordinate_negotiation` | `nodes/negotiation_coordinator.py` | Selects the highest-Pc event and broadcasts a call-for-proposals. |
-| `generate_bids` | `nodes/operator_agent.py` | **Each operator agent independently** computes its avoidance ΔV via **Clohessy–Wiltshire** relative-motion math using *its own* satellite's mean motion. `bid_score = ΔV + maneuver_count·0.1`; the coordinator picks `min(bid_score)` — a real cost trade-off (fuel + maneuver history), with an LLM (Gemini) narrating *why*. |
+| `generate_bids` | `nodes/operator_agent.py` | **Each operator agent independently** computes its avoidance ΔV via **Clohessy–Wiltshire** relative-motion math using *its own* satellite's mean motion. `bid_score = ΔV + maneuver_count·0.1`; the coordinator picks `min(bid_score)` — a real cost trade-off (fuel + maneuver history), with an LLM narrating *why*. That rationale is passed through `content_review.review_negotiation_rationale()` before it is written into `winning_proposal["rationale"]`; a failed review substitutes a deterministic one-line rationale instead. |
 | `await_hitl` | `nodes/hitl_node.py` | The graph **interrupts here** and persists its state; it resumes only on a human `APPROVE`/`VETO` (REST → `resume_after_hitl`). |
 | `execute_maneuver` | `nodes/maneuver_executor.py` | Applies the burn; post-maneuver Pc drops by orders of magnitude. |
 
@@ -74,6 +80,23 @@ close-proximity encounters, demonstrated on the ESA SPEED+ Tango spacecraft-prox
    to a safety envelope (axis ∈ {X,Y,Z}, 1–50 cm/s). **The model never commands thrusters
    directly.** A rule-based fallback runs if the LLM/network is unavailable, so the reflex
    never depends on connectivity.
+5. **Content review** — before the narrative + validated command are cached for the current
+   threat band, `content_review.review_reflex_narrative()` checks completeness (a `Verdict:`
+   line; an `Executing Evasion` line iff the band is CRITICAL; a validated command iff one is
+   required) and consistency (no band-contradicting phrases; no thruster axis in the prose
+   that disagrees with the commanded axis). A failed review discards the LLM output in favour
+   of the deterministic fallback text, and it is the fallback that gets cached — so a bad
+   generation cannot be replayed on every subsequent frame in that band. See `ROUND2.md`.
+
+### `backend/content_review.py`
+
+A synchronous, network-free, stdlib-only module shared by both layers above. It contains no
+LLM call and imports nothing that transitively imports `backend.llm`, so the thing checking
+the model's output cannot itself be fooled by prompt-injected text inside that output. Two
+entry points: `review_reflex_narrative()` (Layer 2, reflex path) and
+`review_negotiation_rationale()` (Layer 1, negotiation path). Both return a `ContentReview`
+dataclass (`passed`, `reasons`, `reviewed_text`, `used_fallback`) and never raise — malformed
+input is a review failure, not an exception.
 
 **Decision-Loop Replay (demo integrity):** the benchmark SPEED+ clip never closes to the
 evasion threshold, so a *clearly-labeled* range **sweep** (`reflex_playbook.swept_range()`)
