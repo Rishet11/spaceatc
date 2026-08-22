@@ -106,11 +106,17 @@ export const ReflexPanel: React.FC = () => {
       setFrameFetchState('ready');
       setError(null);
 
-      // Append decision logs to local terminal state
+      // Append decision logs to local terminal state. The onboard reasoning
+      // is cached per threat band (see backend reflex_playbook.reflex_decision)
+      // and served unchanged on every frame in that band, so consecutive
+      // frames often produce byte-identical lines; collapse those instead of
+      // stacking up repeats.
       if (data.decision_log) {
         const lines = data.decision_log.split('\n');
         setLogMessages((prev) => {
-          const updated = [...prev, ...lines];
+          const updated = [...prev, ...lines].filter(
+            (line, i, arr) => i === 0 || line !== arr[i - 1]
+          );
           return updated.slice(-150); // Keep last 150 lines
         });
       }
@@ -124,7 +130,11 @@ export const ReflexPanel: React.FC = () => {
 
     } catch (err: any) {
       if (seq !== fetchSeqRef.current) return;
-      setFrameData(null);
+      // Keep the last successfully rendered frame in place on a transient
+      // fetch failure. Nulling it here reset pose.distance to null, which
+      // snapped the evasion schematic's satellite marker back to its start
+      // position (approach = 0) until the next frame loaded, making replay
+      // look like it moves forward and then jumps backward.
       setFrameFetchState('unavailable');
       setError(err.message || "Failed to load frame data");
     } finally {

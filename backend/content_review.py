@@ -175,21 +175,50 @@ def review_reflex_narrative(
 # ---------------------------------------------------------------------------
 
 _MAX_TEXT_CHARS = 280
-_SELECTION_VERB_RE = re.compile(r"selected|chosen|wins|won|picked", re.IGNORECASE)
 _MPS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*m/s")
-_PROXIMITY_CHARS = 40
 _DV_RELATIVE_TOLERANCE = 0.05
 
 
-def _span_gap(a: tuple[int, int], b: tuple[int, int]) -> int:
-    """Character distance between two (start, end) spans; 0 if they overlap."""
-    a_start, a_end = a
-    b_start, b_end = b
-    if a_end <= b_start:
-        return b_start - a_end
-    if b_end <= a_start:
-        return a_start - b_end
-    return 0
+def _normalize_name(s: str) -> str:
+    """Fold separator punctuation so 'Demo_A' and 'Demo A' compare equal.
+
+    LLM prose commonly de-codes operator IDs (e.g. drops the underscore) when
+    writing natural-language sentences, so a plain substring check against
+    the raw ID is too strict.
+    """
+    return re.sub(r"[_-]+", " ", s.lower())
+
+
+# A handful of adverbs that legitimately sit between a helper verb ("was")
+# and the selection verb in ordinary English ("was ultimately selected").
+_ADVERB = r"(?:ultimately|clearly|finally|actually|already|indeed|then|now|eventually|simply)"
+
+
+def _credits_loser_re(loser_str: str) -> re.Pattern:
+    """Match the loser name directly playing the grammatical role of the
+    winner in a selection verb: subject-verb ("Demo_B was ultimately
+    selected") or verb-object ("picked Demo_B"), tightly adjacent (only the
+    helper verb and a single adverb may sit in between).
+
+    Deliberately tight rather than a character-proximity + word-blacklist
+    check: comparative prose commonly puts an ordinary word like "over",
+    "while", or "but" near the loser's name for reasons unrelated to
+    crediting it ("chosen over Demo_B", "Demo_B was, over budget, not
+    picked") and a blacklist keyed on those words produces false negatives
+    (missing real misattribution) as often as it fixes false positives. Tight
+    grammatical adjacency instead means any intervening clause — comparison
+    or otherwise — simply breaks the match, so it never falsely credits the
+    loser; the tradeoff is that a misattribution buried in an unusually
+    convoluted sentence can go uncaught, which is the safer failure mode
+    here.
+    """
+    loser_pat = re.escape(_normalize_name(loser_str))
+    return re.compile(
+        rf"\b{loser_pat}\b(?:'s)?(?:\s+(?:was|is|were|has been))?(?:\s+{_ADVERB})?"
+        rf"(?:\s+being)?\s+(?:selected|chosen|the winner|picked|wins|won)\b"
+        rf"|\b(?:selected|chose|chosen|picked)(?:\s+{_ADVERB})?\s+{loser_pat}\b",
+        re.IGNORECASE,
+    )
 
 
 def review_negotiation_rationale(
@@ -220,27 +249,17 @@ def review_negotiation_rationale(
 
     winner_str = str(winner) if winner is not None else ""
     loser_str = str(loser) if loser is not None else ""
-    lowered = haystack.lower()
+    normalized_haystack = _normalize_name(haystack)
 
-    if winner_str and winner_str.lower() not in lowered:
+    if winner_str and _normalize_name(winner_str) not in normalized_haystack:
         reasons.append(f"text must mention the winner name {winner_str!r}")
     elif not winner_str:
         reasons.append("winner name is missing/empty")
 
-    if loser_str:
-        loser_spans = [m.span() for m in re.finditer(re.escape(loser_str), haystack, re.IGNORECASE)]
-        verb_spans = [m.span() for m in _SELECTION_VERB_RE.finditer(haystack)]
-        for ls in loser_spans:
-            for vs in verb_spans:
-                if _span_gap(ls, vs) <= _PROXIMITY_CHARS:
-                    reasons.append(
-                        f"loser name {loser_str!r} appears within "
-                        f"{_PROXIMITY_CHARS} characters of a selection verb"
-                    )
-                    break
-            else:
-                continue
-            break
+    if loser_str and _credits_loser_re(loser_str).search(normalized_haystack):
+        reasons.append(
+            f"text credits the loser {loser_str!r} as the one selected/chosen/winning"
+        )
 
     try:
         wdv = float(winner_dv)

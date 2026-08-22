@@ -14,6 +14,7 @@ Pure logic only (no OpenCV/torch imports) so it is unit-testable on its own.
 
 import json
 import logging
+import re
 
 from backend.content_review import review_reflex_narrative
 
@@ -106,6 +107,20 @@ WARNING_RANGE_M = 1.5
 # Cache the LLM/fallback narrative per threat band so the LLM is invoked at most
 # once per band per process — not on every video frame.
 _DECISION_CACHE: dict = {}
+
+# A cached narrative's own prose (e.g. "Target detected at 9.71 m...") can bake
+# in the range that was live when the LLM generated it. That figure goes stale
+# on every subsequent frame in the same band, since the narrative text itself
+# isn't regenerated. Re-template any such distance mention with the live range
+# on every serve, so the displayed prose never reports a number the caller
+# didn't just pass in. Matches "<number> m" but not "<number> m/s" (delta-v).
+_DISTANCE_MENTION_RE = re.compile(r"\b\d+(?:\.\d+)?\s*m\b(?!/s)")
+
+
+def _template_live_range(lines: list[str], distance_m: float) -> list[str]:
+    """Replace any baked-in distance figure in cached prose with the live range."""
+    live = f"{distance_m:.2f} m"
+    return [_DISTANCE_MENTION_RE.sub(live, line) for line in lines]
 
 
 def reset_decision_cache() -> None:
@@ -348,9 +363,11 @@ async def reflex_decision(
     """Return (decision_log, dodge_command, content_review) for the current frame.
 
     The LLM narrative is generated once per threat band and cached; a fresh
-    live telemetry header is prepended each frame so the displayed range stays
-    current without re-invoking the model. Before the LLM's narrative is
-    cached (and therefore before it can be served on every subsequent frame
+    live telemetry header is prepended each frame, and any distance figure
+    baked into the cached prose itself is re-templated to the live range, so
+    the displayed range stays current without re-invoking the model. Before
+    the LLM's narrative is cached (and therefore before it can be served on
+    every subsequent frame
     in that band) it must pass ``review_reflex_narrative``; a failed review
     causes the LLM result to be discarded in favour of the deterministic
     fallback, and the fallback is cached instead.
@@ -389,7 +406,8 @@ async def reflex_decision(
         f"Search Query: 'debris proximity / range {distance_m:.2f} m'",
         f"Found Play: '{play_name}' (retrieved {len(plays)} of {TOTAL_PLAYS} plays)",
     ]
-    decision_log = "\n".join(header + cached["reasoning"])
+    live_reasoning = _template_live_range(cached["reasoning"], distance_m)
+    decision_log = "\n".join(header + live_reasoning)
     content_review = cached.get(
         "content_review", {"passed": True, "used_fallback": False, "reasons": []}
     )
