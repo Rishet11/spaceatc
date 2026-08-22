@@ -68,6 +68,32 @@ export function bentPathParams(
   return { phaseShiftDeg: 0, radiusScale: 1.02 }; // radial: nudge to a slightly higher shell
 }
 
+/**
+ * Full closed orbit ring for a satellite, given its current position and a
+ * NORMALISED velocity direction (deriveVelocity carries no speed, so true
+ * Keplerian elements aren't recoverable — these orbits are near-circular,
+ * e≈0.0001, so a circle of radius |position| in the plane spanned by
+ * position × velocityDir is visually exact).
+ */
+export function getOrbitRingPoints(
+  position: THREE.Vector3,
+  velocityDir: THREE.Vector3,
+  segments = 128
+): THREE.Vector3[] {
+  const normal = position.clone().cross(velocityDir);
+  if (normal.lengthSq() < 1e-10) return [];
+  normal.normalize();
+
+  const r = position.length();
+  const start = position.clone().setLength(r);
+  const pts: THREE.Vector3[] = [];
+  for (let k = 0; k <= segments; k++) {
+    const theta = (2 * Math.PI * k) / segments;
+    pts.push(start.clone().applyAxisAngle(normal, theta).setLength(r));
+  }
+  return pts;
+}
+
 export function closestApproachIndex(a: THREE.Vector3[], b: THREE.Vector3[]): number {
   const len = Math.min(a.length, b.length);
   let best = 0;

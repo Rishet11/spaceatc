@@ -80,12 +80,18 @@ export const SatelliteLayer: React.FC = () => {
 
   // Update trails when satellites change
   React.useEffect(() => {
+    // Only the pair in an active conjunction, the resolved pair, or DEMO
+    // satellites ever render a trail (see isImportant below) — accumulating
+    // 400-point buffers for the other ~195 satellites was pure waste.
     const satsArray = Object.values(satellites).filter(
       (s) =>
         s.lat !== undefined &&
         s.lon !== undefined &&
         s.alt_km !== undefined &&
-        !destroyedSatellites.includes(s.name)
+        !destroyedSatellites.includes(s.name) &&
+        (highlightedSats.has(s.name) ||
+          s.name?.includes('DEMO') ||
+          (!!resolvedEvent && (s.name === resolvedEvent.satA || s.name === resolvedEvent.satB)))
     );
 
     satsArray.forEach((sat) => {
@@ -103,7 +109,7 @@ export const SatelliteLayer: React.FC = () => {
       }
     });
     setTrailUpdate(t => t + 1);
-  }, [satellites, destroyedSatellites]);
+  }, [satellites, destroyedSatellites, highlightedSats, resolvedEvent]);
 
   useFrame(() => {
     if (!meshRef.current) return;
@@ -181,8 +187,12 @@ export const SatelliteLayer: React.FC = () => {
         args={[undefined, undefined, MAX_INSTANCES]}
         frustumCulled={false}
       >
-        <sphereGeometry args={[0.004, 6, 6]} />
-        <meshBasicMaterial />
+        {/* Was 0.004 — at 202 satellites against a full globe that read as
+            essentially empty. Additive blending gives the dots a bit of glow
+            without competing with the (much brighter, dashed) conjunction
+            paths, which still win on width + bloom threshold. */}
+        <sphereGeometry args={[0.009, 8, 8]} />
+        <meshBasicMaterial transparent blending={THREE.AdditiveBlending} depthWrite={false} />
       </instancedMesh>
       
       {/* Pre-maneuver track: the path the satellite WOULD have flown, kept on

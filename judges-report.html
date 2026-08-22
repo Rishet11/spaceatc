@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAR AWAY 2026 — Judge Panel Report: SpaceATC vs AstroMesh</title>
+<style>
+  :root { --bg:#0a0e17;--surface:#111827;--surface2:#1f2937;--border:#374151;--text:#f3f4f6;--text2:#9ca3af;--accent:#3b82f6;--acc2:#60a5fa;--green:#10b981;--red:#ef4444;--amber:#f59e0b; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; line-height:1.6; }
+  .container { max-width:1200px; margin:0 auto; padding:20px; }
+  header { text-align:center; padding:40px 0 24px; border-bottom:1px solid var(--border); margin-bottom:32px; }
+  header h1 { font-size:2.2rem; font-weight:800; background:linear-gradient(135deg,var(--accent),var(--acc2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+  header p { color:var(--text2); margin-top:8px; font-size:1rem; }
+  .badge-row { display:flex; gap:12px; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 14px; border-radius:999px; font-size:.82rem; font-weight:600; }
+  .badge.alpha { background:rgba(59,130,246,.15); color:var(--acc2); border:1px solid rgba(59,130,246,.3); }
+  .badge.beta { background:rgba(239,68,68,.15); color:var(--red); border:1px solid rgba(239,68,68,.3); }
+  .tabs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:0; }
+  .tabs button { padding:10px 18px; background:var(--surface); color:var(--text2); border:1px solid var(--border); cursor:pointer; font-size:.82rem; font-weight:500; border-radius:8px 8px 0 0; transition:all .15s; }
+  .tabs button:hover { background:var(--surface2); color:var(--text); }
+  .tabs button.active { background:var(--surface2); color:var(--accent); border-color:var(--accent); border-bottom-color:var(--surface2); }
+  .tab-content { background:var(--surface2); border:1px solid var(--border); border-radius:0 8px 8px 8px; padding:28px; min-height:400px; }
+  .tab-pane { display:none; }
+  .tab-pane.active { display:block; }
+  .scoreboard { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:32px; }
+  .scoreboard h2 { font-size:1.2rem; margin-bottom:16px; color:var(--accent); }
+  .score-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+  .score-grid .col { text-align:center; }
+  .score-grid .col h3 { font-size:1rem; font-weight:600; margin-bottom:8px; }
+  .score-num { font-size:2.5rem; font-weight:800; }
+  .score-alpha .score-num { color:var(--acc2); }
+  .score-beta .score-num { color:var(--red); }
+  .score-detail { color:var(--text2); font-size:.82rem; margin-top:4px; }
+  .divider { width:1px; background:var(--border); }
+  .comparison-table { width:100%; border-collapse:collapse; margin:16px 0; font-size:.88rem; }
+  .comparison-table th,.comparison-table td { padding:10px 12px; border:1px solid var(--border); text-align:left; }
+  .comparison-table th { background:var(--surface); color:var(--text2); font-weight:600; }
+  .comparison-table td:first-child { font-weight:600; color:var(--text2); }
+  .score-card { display:inline-flex; align-items:center; gap:8px; background:var(--surface); padding:6px 16px; border-radius:999px; margin:4px 8px 4px 0; font-weight:600; }
+  .score-card.alpha { border:1px solid rgba(59,130,246,.3); }
+  .score-card.beta { border:1px solid rgba(239,68,68,.3); }
+  .glossary { background:var(--surface); border-radius:8px; padding:16px; margin:16px 0; }
+  .glossary dt { font-weight:600; color:var(--accent); margin-top:8px; }
+  .glossary dd { color:var(--text2); margin-left:0; margin-bottom:6px; }
+  .verdict-box { border-left:4px solid var(--accent); background:var(--surface); padding:16px 20px; border-radius:0 8px 8px 0; margin:16px 0; }
+  .verdict-box.warn { border-left-color:var(--amber); }
+  .verdict-box.loss { border-left-color:var(--red); }
+  .verdict-box.win { border-left-color:var(--green); }
+  .tag { display:inline-block; padding:1px 8px; border-radius:4px; font-size:.75rem; font-weight:600; }
+  .tag.alpha { background:rgba(59,130,246,.15); color:var(--acc2); }
+  .tag.beta { background:rgba(239,68,68,.15); color:var(--red); }
+  .tab-pane h3 { font-size:1.2rem; margin:20px 0 10px; color:var(--accent); }
+  .tab-pane h3:first-child { margin-top:0; }
+  .tab-pane h4 { font-size:1rem; margin:16px 0 6px; color:var(--text); }
+  .tab-pane p { margin-bottom:12px; color:#d1d5db; }
+  .tab-pane ul { margin:8px 0 16px 24px; color:#d1d5db; }
+  .tab-pane li { margin-bottom:6px; }
+  @media (max-width:768px) { .score-grid { grid-template-columns:1fr; } .tabs button { font-size:.75rem; padding:8px 10px; } }
+
+  .eq { background:#0d1220; border:1px solid var(--border); padding:14px 16px; margin:14px 0; }
+  .eq .sym { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:1.02rem; color:#e6edf7; display:block; margin-bottom:10px; letter-spacing:.2px; }
+  .eq .plain { color:var(--text2); font-size:.9rem; line-height:1.65; }
+  .eq .src { color:#64748b; font-size:.76rem; font-family:ui-monospace,Menlo,monospace; margin-top:8px; display:block; }
+  .eq.alpha { border-left:3px solid var(--acc2); }
+  .eq.beta { border-left:3px solid var(--acc); }
+  .fact { background:#0d1220; border:1px solid var(--border); border-left:3px solid #f59e0b; padding:14px 16px; margin:14px 0; font-size:.9rem; line-height:1.65; }
+  .fact code { font-family:ui-monospace,Menlo,monospace; color:#e6edf7; font-size:.85rem; }
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+  <h1>🛰️ FAR AWAY 2026 — Judge Panel Report</h1>
+  <p>20 neutral judges evaluate two competing projects in the Space &amp; Aerospace + Agentic Systems track</p>
+  <div class="badge-row">
+    <span class="badge alpha">🟦 SpaceATC (ALPHA)</span>
+    <span class="badge beta">🟥 AstroMesh (BETA)</span>
+    <span class="badge" style="background:rgba(16,185,129,.15);color:var(--green);border-color:rgba(16,185,129,.3)">⚖️ Neutral evaluation</span>
+  </div>
+</header>
+
+<div class="scoreboard">
+  <h2>📊 Aggregate Scoreboard (20 Judges)</h2>
+  <div class="score-grid">
+    <div class="col score-alpha">
+      <h3>SpaceATC (ALPHA)</h3>
+      <div class="score-num">7.68</div>
+      <div class="score-detail">/ 10 across 20 judges</div>
+    </div>
+    <div class="col score-beta">
+      <h3>AstroMesh (BETA)</h3>
+      <div class="score-num">7.27</div>
+      <div class="score-detail">/ 10 across 20 judges</div>
+    </div>
+    <div class="col" style="border-left:1px solid var(--border);padding-left:16px;">
+      <h3>🏆 Verdict</h3>
+      <div style="margin-top:8px;">
+        <span style="color:var(--acc2);font-weight:800;font-size:1.3rem;">SpaceATC</span>
+        <div style="color:var(--text2);font-size:.82rem;margin-top:4px;">wins 14 / 20 judge votes</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs" id="tabNav">
+  <button class="active" data-tab="0">📊 Overview</button><button data-tab="1">🔧 Sr Engineer</button><button data-tab="2">💼 Non-Tech Exec</button><button data-tab="3">🎬 Demo &amp; Pitch</button><button data-tab="4">🏗️ Backend Arch</button><button data-tab="5">🧮 Math Correctness</button><button data-tab="6">🔒 Security</button><button data-tab="7">🎨 Frontend Visual</button><button data-tab="8">📝 Frontend Code</button><button data-tab="9">🖱️ UX</button><button data-tab="10">💰 VC</button><button data-tab="11">📋 Product</button><button data-tab="12">🛸 Space Ops</button><button data-tab="13">🌌 Orbital Mech</button><button data-tab="14">🤖 ML/LLM</button><button data-tab="15">🧠 Agentic Design</button><button data-tab="16">🔍 Skeptic</button><button data-tab="17">⚔️ Red Team</button><button data-tab="18">🏁 Hackathon Vet</button><button data-tab="19">🎓 Student</button><button data-tab="20">🎤 Pitch Coach</button><button data-tab="21">🧮 Equations Explained</button><button data-tab="22">🔎 Verified Evidence</button>
+</div>
+
+<div class="tab-content">
+<!-- TAB 0: Overview -->
+<div class="tab-pane active" id="tab0">
+  <h3>⚖️ Executive Summary</h3>
+  <p>Two teams built satellite collision-avoidance systems for FAR AWAY 2026. <strong>SpaceATC (alpha)</strong> built a multi-agent <em>negotiation</em> system — two AI "operator agents" bid delta-v to avoid a collision, a coordinator picks the winner, and a human approves. <strong>AstroMesh (beta)</strong> built a distributed <em>consensus</em> system — a Go cluster votes on maneuvers, verified with formal math (TLA+), displayed on a realistic CesiumJS 3D globe.</p>
+  <div class="verdict-box win"><strong>Panel verdict: SpaceATC wins 14 of 20 judge votes.</strong> The decisive factors: a working live demo URL, real end-to-end integration (SGP4 → LangGraph agents → WebSocket → 3D globe → human approval), an honest self-audit that pre-empts judge questions, and a clearer problem wedge. AstroMesh has a more visually polished frontend and more realistic data pipeline, but the live demo is the strongest card at a hackathon — and SpaceATC is the only one that has it.</div>
+  <h3>Score Breakdown (all judges)</h3>
+  <table class="comparison-table">
+    <tr><th>Judge Persona</th><th>SpaceATC</th><th>AstroMesh</th><th>Winner</th></tr>
+    <tr><td>1. Senior Engineer</td><td>7.5</td><td>6.5</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>2. Non-Technical Exec</td><td>7.5</td><td>8.5</td><td><span class="tag beta">AstroMesh</span></td></tr>
+    <tr><td>3. Demo &amp; Pitch Specialist</td><td>8.0</td><td>6.5</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>4. Backend Architecture</td><td>7.5</td><td>7.0</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>5. Algorithm Correctness</td><td>7.0</td><td>8.0</td><td><span class="tag beta">AstroMesh</span></td></tr>
+    <tr><td>6. Security &amp; Robustness</td><td>6.5</td><td>6.0</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>7. Frontend Visual</td><td>7.5</td><td>9.0</td><td><span class="tag beta">AstroMesh</span></td></tr>
+    <tr><td>8. Frontend Code Quality</td><td>7.5</td><td>6.5</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>9. UX &amp; Interaction</td><td>8.0</td><td>8.0</td><td><span class="tag" style="background:rgba(16,185,129,.15);color:var(--green)">Tie</span></td></tr>
+    <tr><td>10. VC Investor</td><td>7.5</td><td>7.5</td><td><span class="tag" style="background:rgba(16,185,129,.15);color:var(--green)">Tie</span></td></tr>
+    <tr><td>11. Product Executive</td><td>8.0</td><td>7.0</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>12. Space Ops Veteran</td><td>7.5</td><td>7.0</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>13. Orbital Mechanics Expert</td><td>7.0</td><td>8.5</td><td><span class="tag beta">AstroMesh</span></td></tr>
+    <tr><td>14. ML/LLM Systems</td><td>8.5</td><td>6.0</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>15. Agentic Design</td><td>9.0</td><td>6.5</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>16. Professional Skeptic</td><td>7.0</td><td>6.5</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>17. Red Team Q&amp;A</td><td>7.5</td><td>7.0</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>18. Hackathon Veteran</td><td>9.0</td><td>7.0</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>19. CS Student Judge</td><td>8.0</td><td>7.5</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+    <tr><td>20. Pitch Coach</td><td>8.0</td><td>7.5</td><td><span class="tag alpha">SpaceATC</span></td></tr>
+  </table>
+
+  <h3>Glossary (plain English)</h3>
+  <div class="glossary">
+    <dl>
+      <dt>SGP4</dt><dd>A mathematical model that predicts where a satellite will be at any time from tracking data (TLEs). Think of it as the GPS prediction algorithm for satellites.</dd>
+      <dt>TLE</dt><dd>Two Line Element — a format encoding a satellite's orbit position velocity inclination as two lines of text. Thousands are published daily by the US Space Force.</dd>
+      <dt>Conjunction</dt><dd>When two space objects pass close enough to warrant concern — a "near miss" in orbit.</dd>
+      <dt>Pc (Collision Probability)</dt><dd>Probability two objects will collide, computed from positions and uncertainties. 1e-6 (one in a million) is a common action threshold.</dd>
+      <dt>Delta-V</dt><dd>A measure of how much a satellite must change velocity to avoid a collision. Higher = more fuel.</dd>
+      <dt>Clohessy-Wiltshire (CW)</dt><dd>A simplified math model of how two nearby satellites move relative to each other, used to plan avoidance maneuvers.</dd>
+      <dt>LangGraph</dt><dd>An AI framework (by the makers of LangChain) for building multi-step agent workflows that can pause, get human input, and resume.</dd>
+      <dt>TLA+</dt><dd>A formal mathematical language for proving that a system's design is correct — like mathematically proving a traffic light can never show green in all directions.</dd>
+      <dt>Bully Election</dt><dd>A distributed algorithm where the highest-ID node becomes the leader. Like the oldest kid deciding what game to play.</dd>
+      <dt>2-Phase Commit (2PC)</dt><dd>A protocol where multiple computers agree on a decision: first "prepare" (can everyone do it?), then "commit" (do it).</dd>
+      <dt>Covariance</dt><dd>A mathematical measure of uncertainty in a satellite's position. Like the "error bar" around a weather forecast.</dd>
+      <dt>HITL (Human-in-the-loop)</dt><dd>A system design where a human must approve before an automated decision executes.</dd>
+      <dt>Space-Track</dt><dd>The US Space Force's public catalogue of all tracked objects in orbit (~31,000).</dd>
+      <dt>CelesTrak</dt><dd>A public service that republishes Space-Track data plus the SOCRATES conjunction reports.</dd>
+      <dt>CDM (Conjunction Data Message)</dt><dd>A standardized format operators exchange when a close approach is predicted.</dd>
+      <dt>SOCRATES</dt><dd>CelesTrak's automated system screening the entire satellite catalogue daily for close approaches.</dd>
+      <dt>Kessler Syndrome</dt><dd>A runaway chain reaction where space debris creates more debris, making orbits unusable for generations.</dd>
+      <dt>RAG (Retrieval-Augmented Generation)</dt><dd>An AI pattern grounding an LLM's answer in a specific document lookup, reducing hallucinations.</dd>
+      <dt>YOLO (You Only Look Once)</dt><dd>A real-time neural network that finds objects in images or video frames.</dd>
+      <dt>PnP (Perspective-n-Point) Pose</dt><dd>A computer vision method determining a camera's position relative to a known 3D object.</dd>
+    </dl>
+  </div>
+</div>
+<!-- TAB 1: Senior Engineer -->
+<div class="tab-pane" id="tab1">
+  <h3>🔧 Judge 1 — Senior Software Engineer</h3>
+  <p><em>Focus: code quality, architecture depth, what's real vs demo theater</em></p>
+  <div class="score-card alpha">SpaceATC: 7.5/10</div>
+  <div class="score-card beta">AstroMesh: 6.5/10</div>
+  <h4>SpaceATC — What impressed me</h4>
+  <ul>
+    <li><strong>Real LangGraph state machine.</strong> 6-node graph with interrupt/resume via SQLite checkpoints (<code>graph.py:52-86</code>). Hardest part of LangGraph, handled correctly.</li>
+    <li><strong>Real orbital math.</strong> SGP4 propagation (<code>propagator.py:61-80</code>), scipy TCA optimization (<code>conjunction.py:130-174</code>).</li>
+    <li><strong>Operator bids are real math, not LLM vibes.</strong> Clohessy-Wiltshire delta-v with binary search (<code>conjunction.py:290-353</code>). LLM only narrates.</li>
+    <li><strong>Honest self-audit.</strong> AUDIT.md names 17 issues including a fixed planetary-rotation bug.</li>
+  </ul>
+  <h4>SpaceATC — Weak spots</h4>
+  <ul>
+    <li><strong>Demo conjunction is engineered.</strong> Only fires via injection (<code>routes.py:267-304</code>). Live screening finds nothing (all sats are "SpaceX").</li>
+    <li><strong>Weak test suite.</strong> 5 test files but 2 have zero assertions. Only ~7 pytest tests. No route/graph coverage.</li>
+    <li><strong>Global mutable state.</strong> <code>sat_cache</code> shared across modules via direct import — race conditions.</li>
+  </ul>
+  <h4>AstroMesh — What impressed me</h4>
+  <ul>
+    <li><strong>Real Go concurrency.</strong> Bully election with channel-gathered votes, atomic locks, 2s liveness ticks (<code>election.go:46-132</code>).</li>
+    <li><strong>Full-catalogue screening.</strong> Real Space-Track login, 31k 3LE fetch, disk cache, SGP4 sieve→coarse→fine (<code>mock-gateway.js:487-694</code>).</li>
+    <li><strong>TLA+ spec.</strong> 203 lines with safety/liveness properties (<code>AstroMesh.tla:163-189</code>). More than most hackathon formal methods.</li>
+  </ul>
+  <h4>AstroMesh — Weak spots</h4>
+  <ul>
+    <li><strong>Deployed consensus is fake.</strong> Gateway simulates with random 70% votes (<code>:411-434</code>). Go cluster shares one Postgres — defeating distribution.</li>
+    <li><strong>Zero tests.</strong> No <code>*_test.go</code>. CI is only a curl keep-alive ping.</li>
+    <li><strong>Architecture split.</strong> Go cluster and Node gateway are separate deployments borrowing credibility from each other.</li>
+    <li><strong>TLA+ disconnected from code.</strong> No evidence TLC was run. Go impl violates the spec's LeaderConsistency invariant.</li>
+  </ul>
+  <div class="verdict-box win"><strong>Verdict:</strong> SpaceATC has real end-to-end integration even if scoped narrowly. AstroMesh has impressive components but the headline doesn't match what ships. SpaceATC by 1 point.</div>
+</div>
+<!-- TAB 2: Non-Technical Exec -->
+<div class="tab-pane" id="tab2">
+  <h3>💼 Judge 2 — Non-Technical Executive / VC</h3>
+  <p><em>Cannot read code. Evaluates README quality, problem clarity, trust signals.</em></p>
+  <div class="score-card alpha">SpaceATC: 7.5/10</div>
+  <div class="score-card beta">AstroMesh: 8.5/10</div>
+  <p><strong>SpaceATC's hook grabbed me:</strong> "Stargaze tells you you'll crash but not who moves" — a specific, memorable gap with real numbers ($11.1B losses, 144K maneuvers). Live demo URL = they shipped. BUT: zero screenshots in a visual product README, brutal jargon wall (SGP4, CW, 6-DOF), no honesty section.</p>
+  <p><strong>AstroMesh's README was built to win readers:</strong> hero screenshot immediately, sourced problem table (SpaceX-vs-Amazon incident cited), six screenshots, measured accuracy against real events, "Honest limitations" section. BUT: no live demo URL — screenshots can't match a clickable demo if WiFi works.</p>
+  <div class="verdict-box loss"><strong>My vote: AstroMesh 8.5 to 7.5.</strong> Trust compounds faster than cleverness at pitch stage. AstroMesh showed evidence; SpaceATC asked for belief. Based on README alone, AstroMesh gets the nod.</div>
+</div>
+
+<!-- TAB 3: Demo & Pitch -->
+<div class="tab-pane" id="tab3">
+  <h3>🎬 Judge 3 — Demo &amp; Pitch Specialist</h3>
+  <p><em>Live demo reliability, failure risk, visual drama, pitch readiness.</em></p>
+  <div class="score-card alpha">SpaceATC: 8.0/10</div>
+  <div class="score-card beta">AstroMesh: 6.5/10</div>
+  <p><strong>SpaceATC demo:</strong> Open HF URL → inject conjunction → StageTracker advances → agents bid → HITL with 30s countdown → approve → Pc drops → explosion/outcome. ~90s, 1 failure point (internet), zero credentials. Risk: OrbitMind LFS pointers are 133 bytes (not real weights).</p>
+  <p><strong>AstroMesh demo:</strong> Clone → create .env with 3 credentials → warm cache 1-2 min → open localhost → 31k points load → open-ended exploration. 5+ failure points: Space-Track registration, Cesium token, Groq key, cold cache, venue WiFi blocking Space-Track.</p>
+  <p><strong>Visual drama:</strong> AstroMesh wins on pure wow (Cesium photoreal globe, 31k objects, GLB models, launch HUD). SpaceATC wins on narrative arc (detect→negotiate→approve→resolve with tension and payoff).</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 8.0 to 6.5.</strong> Working but simpler beats broken but spectacular at a hackathon. AstroMesh's demo has too many SPOFs for venue conditions.</div>
+</div>
+
+<!-- TAB 4: Backend Architecture -->
+<div class="tab-pane" id="tab4">
+  <h3>🏗️ Judge 4 — Backend Architecture</h3>
+  <p><em>Design decisions, coherence, deployment split, overengineering.</em></p>
+  <div class="score-card alpha">SpaceATC: 7.5/10</div>
+  <div class="score-card beta">AstroMesh: 7.0/10</div>
+  <p><strong>SpaceATC:</strong> Single Python FastAPI backend with clear layers — orbital engine, LangGraph agent orchestration, WebSocket transport. Each component maps to a real system function. HITL interrupt + SQLite checkpoint is the right architecture for safety-critical decisions.</p>
+  <p><strong>AstroMesh:</strong> Two parallel backends: Node gateway doing real orbital work + Go cluster doing distributed consensus. The Go cluster shares ONE Postgres DB across all 4 nodes — consensus ceremony over centralized state. The deployed demo uses the gateway's simulated consensus; the "real" Go consensus has fake satellite data (static lat/lon, never propagated). Each half borrows credibility from the other.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC.</strong> A single coherent system beats two half-systems that don't actually work together.</div>
+</div>
+
+<!-- TAB 5: Algorithm Correctness -->
+<div class="tab-pane" id="tab5">
+  <h3>🧮 Judge 5 — Algorithm &amp; Math Correctness</h3>
+  <p><em>Which math is more correct, defensible, and honestly scoped.</em></p>
+  <div class="score-card alpha">SpaceATC: 7.0/10</div>
+  <div class="score-card beta">AstroMesh: 8.0/10</div>
+  <p><strong>SpaceATC math:</strong> TCA via scipy bounded optimization. Pc = 2D Gaussian with fixed 1km sigma (ad-hoc, acknowledged). CW delta-v with per-satellite mean motion (correct but circular-only, no eccentricity check). Correct Vallado GMST.</p>
+  <p><strong>AstroMesh math:</strong> Full-catalogue screening with apogee-perigee sieve → coarse → fine TCA. SOCRATES-style max-probability Pc with dilution threshold (more defensible). Universal-variable Kepler solver with Stumpff functions for maneuver verification — handles elliptical orbits. Re-screens maneuvers against ALL 31k objects and iterates. Tested against 30 real USSF events (TCA exact to 1s, miss within 2km 93%).</p>
+  <div class="verdict-box loss"><strong>Verdict: AstroMesh 8.0 to 7.0.</strong> The full-catalogue re-screening with Kepler solver is genuinely higher algorithmic depth. AstroMesh's strongest category.</div>
+</div>
+<!-- TAB 6: Security -->
+<div class="tab-pane" id="tab6">
+  <h3>🔒 Judge 6 — Security &amp; Robustness</h3>
+  <p><em>Authentication, CORS, input validation, error handling, XSS risks.</em></p>
+  <div class="score-card alpha">SpaceATC: 6.5/10</div>
+  <div class="score-card beta">AstroMesh: 6.0/10</div>
+  <p>Neither project is production-secure (expected for a hackathon). Both have CORS *, no auth, no rate limiting (except AstroMesh per-IP chat limiter).</p>
+  <p><strong>SpaceATC issues:</strong> Global mutable sat_cache with no locking — concurrent injections race. demo/reset deletes LangGraph internal tables by name. Naive/aware datetime mixing produces silent timezone bugs.</p>
+  <p><strong>AstroMesh issues:</strong> v-html of marked.parse() on LLM output = XSS vulnerability. JSON decode errors swallowed silently throughout Go handlers. Unauthenticated /reset and /control/node/stop endpoints. WS origin check always returns true.</p>
+  <div class="verdict-box warn"><strong>Verdict: SpaceATC narrowly 6.5 to 6.0.</strong> Smaller XSS surface (no raw HTML rendering of LLM output). Both need auth before any real deployment.</div>
+</div>
+
+<!-- TAB 7: Frontend Visual -->
+<div class="tab-pane" id="tab7">
+  <h3>🎨 Judge 7 — Frontend Visual Design</h3>
+  <p><em>Subjective visual judgment: 3D rendering, models, lighting, layout, typography.</em></p>
+  <div class="score-card alpha">SpaceATC: 7.5/10</div>
+  <div class="score-card beta">AstroMesh: 9.0/10</div>
+  <p><strong>AstroMesh — A genuine visual production.</strong> CesiumJS photorealistic Earth with bloom, night-lights shader, cloud layers, 31k-object point cloud with RCS-proportional 3D GLB models (ISS, Starlink, debris types). Boot loader with progress bar. Four sliding drawers. AI chat flies camera around globe. Launch HUD sim. This is AstroMesh's strongest feature.</p>
+  <p><strong>SpaceATC — Clean and functional.</strong> Three.js dark-space aesthetic with satellite orbit traces, pulsing red markers, explosion particles. StageTracker and MathPanel communicate system state clearly. Landing page narrative with count-up animation. But low-res Earth texture loaded from GitHub CDN (fails offline). Scene at 1x = "still image" (their words).</p>
+  <div class="verdict-box loss"><strong>Verdict: AstroMesh 9.0 to 7.5.</strong> CesiumJS with custom GLB models is a stronger visual product than a basic Three.js globe. SpaceATC's widest gap: judges see AstroMesh's globe first and form an impression before code is examined.</div>
+</div>
+
+<!-- TAB 8: Frontend Code -->
+<div class="tab-pane" id="tab8">
+  <h3>📝 Judge 8 — Frontend Code Quality</h3>
+  <p><em>TypeScript, state management, component structure, dead code, error handling.</em></p>
+  <div class="score-card alpha">SpaceATC: 7.5/10</div>
+  <div class="score-card beta">AstroMesh: 6.5/10</div>
+  <p><strong>SpaceATC:</strong> Full TypeScript with typed WS message union (<code>types/index.ts</code>), Zustand store separate from transport. WS with exponential backoff reconnect. Optimistic UI rollback on HITL failure — strongest honesty signal. StrictMode double-veto guard. But satellite.js is a phantom dependency (in package.json, imported NOWHERE). 3x copy-pasted geodeticToThreeJS. Dead activeMathTrace state.</p>
+  <p><strong>AstroMesh:</strong> Plain JS, no TypeScript, no linter. GlobeView.vue is a 1974-line god component. conjWorker.js (full SGP4 pipeline) is unused dead code. Error handling = catch{/*ignore*/} throughout. No state store — all state in App.vue refs. Positive: honest inline comments, chunked catalogue updates.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 7.5 to 6.5.</strong> TypeScript, proper state management, and defensive patterns beat a god component with dead code and silent error catches.</div>
+</div>
+
+<!-- TAB 9: UX & Interaction -->
+<div class="tab-pane" id="tab9">
+  <h3>🖱️ Judge 9 — UX &amp; Interaction Design</h3>
+  <p><em>Information hierarchy, feedback, narrative clarity, cognitive load.</em></p>
+  <div class="score-card alpha">SpaceATC: 8.0/10</div>
+  <div class="score-card beta">AstroMesh: 8.0/10</div>
+  <p>Different strengths; genuinely tied.</p>
+  <p><strong>SpaceATC</strong> is built for presentation: 4-act story (Detect→Negotiate→Decide→Outcome), StageTracker advances with each WS message, HITL countdown bar creates tension, MathPanel shows derivation trace. Designed so a first-time viewer understands the story without code reading.</p>
+  <p><strong>AstroMesh</strong> is built for use: mission-control dashboard with search, filters, AI chat, launch planner, node controls, history. The AI chat with natural-language camera control is the standout UX moment. Higher information density — a first-time viewer might not know where to look, but an operator would find everything they need.</p>
+  <div class="verdict-box"><strong>Tie 8.0-8.0.</strong> SpaceATC wins on narrative clarity (better for pitch); AstroMesh wins on depth (better for daily use). Different design goals, equal quality.</div>
+</div>
+<!-- TAB 10: VC Investor -->
+<div class="tab-pane" id="tab10">
+  <h3>💰 Judge 10 — VC Investor</h3>
+  <p><em>Problem urgency, market size, wedge sharpness, team signals.</em></p>
+  <div class="score-card alpha">SpaceATC: 7.5/10</div>
+  <div class="score-card beta">AstroMesh: 7.5/10</div>
+  <p><strong>Tied with different risk profiles.</strong> SpaceATC has a sharper wedge ("coordination gap after Stargaze"), live demo as proof of shipment, and OrbitMind as potential defensible IP. Risk: narrow demo, unproven at scale. AstroMesh has bigger vision (trustless orbital traffic control), strong doc discipline, published accuracy numbers. Risk: five features suggest no focus. First question: "which one becomes the company?"</p>
+  <div class="verdict-box"><strong>Tie 7.5-7.5.</strong> I'd advance both. Different risk/reward: SpaceATC is a sharper bet with narrower proof; AstroMesh is a bigger vision with stronger docs but more execution risk.</div>
+</div>
+
+<!-- TAB 11: Product Executive -->
+<div class="tab-pane" id="tab11">
+  <h3>📋 Judge 11 — Product Executive</h3>
+  <p><em>Pain sharpness, product completeness, roadmap realism.</em></p>
+  <div class="score-card alpha">SpaceATC: 8.0/10</div>
+  <div class="score-card beta">AstroMesh: 7.0/10</div>
+  <p><strong>SpaceATC solves a sharper pain.</strong> Clearly defined problem (who maneuvers?), product delivers exactly that, gap between promise and delivery is small. Focused roadmap (RL optimization, HW port, trust framework).</p>
+  <p><strong>AstroMesh tries to solve everything</strong> — screening, maneuver planning, consensus, launch planning, AI chat, history. Each feature is shallower than a dedicated product. "Trustless" claim is risky when deployed version uses simulated consensus. Product identity is fuzzy. Needs to pick one wedge.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 8.0 to 7.0.</strong> A focused product solving one pain well beats a broad product solving each part shallowly.</div>
+</div>
+
+<!-- TAB 12: Space Ops Veteran -->
+<div class="tab-pane" id="tab12">
+  <h3>🛸 Judge 12 — Space Operations Veteran</h3>
+  <p><em>Flight dynamics engineer: CDM workflows, operational realism.</em></p>
+  <div class="score-card alpha">SpaceATC: 7.5/10</div>
+  <div class="score-card beta">AstroMesh: 7.0/10</div>
+  <p><strong>SpaceATC workflow is recognizably similar to real ops:</strong> detect → coordinate → plan → HITL approve → execute. Roles map to real jobs. But: "bidding" is fiction (operators don't compete to maneuver), 30s HITL timeout is absurdly fast (real = hours/days), CW assumes circular orbits, TLEs treated as truth (no covariance).</p>
+  <p><strong>AstroMesh data pipeline mirrors real C A:</strong> Space-Track fetch → sieve → coarse scan → fine TCA → SOCRATES Pc. But: voting consensus has no analogue in real operations (operators coordinate via phone/email/CCSDS), zero CDM parsing code (empty array despite README claim), browser SGP4 not production-grade.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 7.5 to 7.0.</strong> Neither deploys to a real control room today. SpaceATC's workflow structure is a recognizable foundation; AstroMesh's decision model is alien to space operations. Familiarity of process matters for operational verisimilitude.</div>
+</div>
+
+<!-- TAB 13: Orbital Mechanics Expert -->
+<div class="tab-pane" id="tab13">
+  <h3>🌌 Judge 13 — Orbital Mechanics Specialist</h3>
+  <p><em>SGP4 implementation, coordinate frames, time systems, probability methods.</em></p>
+  <div class="score-card alpha">SpaceATC: 7.0/10</div>
+  <div class="score-card beta">AstroMesh: 8.5/10</div>
+  <p><strong>SpaceATC correct:</strong> Valid Vallado GMST polynomial, proper JD splitting for SGP4, iterative Bowring WGS-84 conversion, CW internally consistent. Fixed-sigma Pc (ad-hoc), CW only for circular orbits, demo is one specific geometry.</p>
+  <p><strong>AstroMesh better:</strong> Full-catalogue screening with proper geometric sieve. SOCRATES max-Pc with dilution threshold (right method). Universal-variable Kepler solver with Stumpff functions — handles elliptical orbits. Re-screens maneuvers against all 31k objects and iterates until clear — gold standard COLA math. Tested against 30 real USSF events. Weakness: physics lives in Node gateway using satellite.js from node_modules.</p>
+  <div class="verdict-box loss"><strong>Verdict: AstroMesh 8.5 to 7.0.</strong> The full-catalogue re-screening with Kepler solver is genuinely higher algorithmic completeness. AstroMesh's strongest category.</div>
+</div>
+
+<!-- TAB 14: ML/LLM Systems -->
+<div class="tab-pane" id="tab14">
+  <h3>🤖 Judge 14 — ML &amp; LLM Systems</h3>
+  <p><em>Is AI load-bearing or garnish? Hallucination/failure risks? Fallback on API outage?</em></p>
+  <div class="score-card alpha">SpaceATC: 8.5/10</div>
+  <div class="score-card beta">AstroMesh: 6.0/10</div>
+  <p><strong>SpaceATC — LLM confined, ML real.</strong> The LLM narrates but never decides: delta-v from deterministic math, fallback to deterministic string on LLM failure (<code>operator_agent.py:133-136</code>). Threat classification rule-based. Thruster commands behind hard clamp guardrail. OrbitMind runs real PyTorch inference (YOLO+keypoints+PnP pose). Risk: LFS pointer issue means weights may not be present at demo time.</p>
+  <p><strong>AstroMesh — Chat wrapper with no depth.</strong> AI agent in Go = database cron polling risk_index>70. Natural-language chat = LLM passthrough with live-state JSON. No fallback if LLM API goes down. XSS surface from v-html of LLM output. This is a grounded chatbot, not an agent.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 8.5 to 6.0.</strong> Demonstrates where AI belongs in safety-critical systems (narration only, deterministic fallbacks, vision with rule guardrails). AstroMesh's AI is a thin chat wrapper. OrbitMind shows genuine ML engineering.</div>
+</div>
+<!-- TAB 15: Agentic Design -->
+<div class="tab-pane" id="tab15">
+  <h3>🧠 Judge 15 — Agentic Systems Design</h3>
+  <p><em>Which is genuinely "agentic" vs a script or prompt chain?</em></p>
+  <div class="score-card alpha">SpaceATC: 9.0/10</div>
+  <div class="score-card beta">AstroMesh: 6.5/10</div>
+  <p><strong>Biggest gap between the two projects.</strong> The track is "Agentic & Autonomous Systems" and the architectures differ dramatically.</p>
+  <p><strong>SpaceATC: genuine multi-agent orchestration.</strong> 6 specialized agents in LangGraph with interrupt/resume via SQLite checkpoints. HITL pauses execution and persists state — resumes from fresh process (<code>graph.py:85</code>, <code>routes.py:378-392</code>). Exactly-once WS event delivery across resume (<code>graph.py:109-141</code>). LLM confined to narration; all decisions deterministic. This is the right architecture for autonomous safety systems.</p>
+  <p><strong>AstroMesh: agents in name only.</strong> "Autonomous triage agent" = 8s DB ticker polling risk_index>70. "AI advisor" = LLM passthrough with camera directives. Consensus protocol is voting, not agent negotiation — no bid, no cost function, no trade-off. No HITL: consensus approves without a human. This is distributed systems with a chat wrapper, not agentic architecture.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 9.0 to 6.5.</strong> For a track named "Agentic & Autonomous Systems," SpaceATC demonstrates genuine agent orchestration while AstroMesh demonstrates distributed consensus. SpaceATC's strongest category.</div>
+</div>
+
+<!-- TAB 16: Skeptic -->
+<div class="tab-pane" id="tab16">
+  <h3>🔍 Judge 16 — Professional Skeptic</h3>
+  <p><em>Claims vs reality: what does each promise vs what does the code deliver?</em></p>
+  <div class="score-card alpha">SpaceATC: 7.0/10</div>
+  <div class="score-card beta">AstroMesh: 6.5/10</div>
+  <p><strong>SpaceATC claim gaps:</strong> "Screens Starlink fleet" → only engineered demo pair (all sats are SpaceX, no cross-operator pairs). OrbitMind "onboard reflex" → real ML pipeline but weights are LFS pointers (133 bytes). Pc formula → ad-hoc 2D Gaussian with 1km sigma, not covariance-based. BUT: team wrote AUDIT.md pre-emptively disclosing these.</p>
+  <p><strong>AstroMesh claim gaps:</strong> "Trustless, formally-verified" → deployed consensus simulated with dice rolls, no evidence TLC model checker run. "Distributed consensus" → all 4 Go nodes share one Postgres DB. "Raft-consensus" → it's Bully+2PC. "Real US Space Force CDMs" → zero CDM parsing code (empty array in mock-gateway.js:63). "Live demo" → no hosted URL. No self-audit.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 7.0 to 6.5.</strong> SpaceATC's claims are closer to what the code delivers, and the audit pre-empts the biggest gaps. AstroMesh's most impressive claims diverge most from reality.</div>
+</div>
+
+<!-- TAB 17: Red Team Q&A -->
+<div class="tab-pane" id="tab17">
+  <h3>⚔️ Judge 17 — Red Team (Q&amp;A Attack Surface)</h3>
+  <p><em>Most damaging questions each team could receive; which survives longer.</em></p>
+  <div class="score-card alpha">SpaceATC: 7.5/10</div>
+  <div class="score-card beta">AstroMesh: 7.0/10</div>
+  <p><strong>SpaceATC's hardest question:</strong> "Can you show this with real data, not your injected demo pair?" Best answer: "Our contribution is the negotiation layer — the demo injection proves the end-to-end pipeline. Given a real conjunction from any source, the process is identical. Here's our screening architecture and why we chose to focus on the negotiation problem." AUDIT.md pre-empts this.</p>
+  <p><strong>AstroMesh's hardest question:</strong> "Is the consensus in your live demo the same as the Go cluster?" If a judge read the code, they know: Node gateway simulates with random votes. Follow-up: "Run your TLC model checker right now?" If they haven't, "formally verified" becomes "formally documented" in the room.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 7.5 to 7.0.</strong> SpaceATC's weakest questions are about scope — defensible by acknowledging scope. AstroMesh's weakest questions are about claims vs reality — harder to talk your way out of in real time.</div>
+</div>
+
+<!-- TAB 18: Hackathon Veteran -->
+<div class="tab-pane" id="tab18">
+  <h3>🏁 Judge 18 — Hackathon Veteran (50+ Judged)</h3>
+  <p><em>Scope-vs-polish, betting strategy, demo-day psychology.</em></p>
+  <div class="score-card alpha">SpaceATC: 9.0/10</div>
+  <div class="score-card beta">AstroMesh: 7.0/10</div>
+  <p><strong>Not close from hackathon strategy perspective.</strong> SpaceATC made smarter bets: live demo over architecture on paper (HF URL = highest RO asset at a hackathon), narrative arc over feature count (4-act story vs open-ended dashboard), self-audit as pre-emptive trust strategy (admitting flaws makes you MORE credible), 76 commits of iterative hardening vs 18 (1 visible).</p>
+  <p>AstroMesh's bets (TLA+, distributed consensus) are technically impressive but undemoable in 5 minutes. Formal methods output is text, not a visual moment. Go cluster consensus adds complexity without demo payoff — the Node gateway does the work anyway. No live URL, no tests, no self-audit.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 9.0 to 7.0.</strong> AstroMesh's intellectual bets score poorly on hackathon criteria: "does it work, can I see it, does it tell a story?" SpaceATC optimized for those dimensions.</div>
+</div>
+
+<!-- TAB 19: Student Judge -->
+<div class="tab-pane" id="tab19">
+  <h3>🎓 Judge 19 — CS Student Judge</h3>
+  <p><em>Learnability, code clarity, documentation, which inspires.</em></p>
+  <div class="score-card alpha">SpaceATC: 8.0/10</div>
+  <div class="score-card beta">AstroMesh: 7.5/10</div>
+  <p>SpaceATC is more educational: LangGraph graph is self-documenting (you see the whole flow in one file), comments explain WHY not just WHAT, PRD and ARCHITECTURE give a clear reading path, TypeScript is more approachable for React-trained students. AstroMesh is more inspiring: "built a CesiumJS globe with 31k satellites and a Go cluster with formal verification" sounds better in a portfolio. But god component (1974 lines) and thinner docs don't teach well.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 8.0 to 7.5.</strong> More learnable. AstroMesh is more aspirational but doesn't teach as well.</div>
+</div>
+
+<!-- TAB 20: Pitch Coach -->
+<div class="tab-pane" id="tab20">
+  <h3>🎤 Judge 20 — Pitch Coach</h3>
+  <p><em>Narrative strength, pitch outlines, who wins the room.</em></p>
+  <div class="score-card alpha">SpaceATC: 8.0/10</div>
+  <div class="score-card beta">AstroMesh: 7.5/10</div>
+  <p><strong>SpaceATC's ideal 3-min pitch:</strong> Hook (Stargaze gap → both operators swerving same way), Demo (inject → agents bid → HITL → Pc collapses), Differentiation (only team solving "who moves", OrbitMind vision backup), Close (live URL, audited, shipped).</p>
+  <p><strong>AstroMesh's ideal pitch:</strong> Hook (31k objects + no coordination → orbital tragedy), Demo description (Cesium globe + 31k dots + AI chat fly-to), Differentiators (TLA+ proof, 4-node consensus), Close (infrastructure layer for orbital economy).</p>
+  <p><strong>Room winner with equal delivery: SpaceATC.</strong> Problem hook is more specific and urgent. Live demo proof beats description. HITL approval creates human tension that consensus can't match. AstroMesh's only chance is a technical-heavy panel where formal methods resonate.</p>
+  <div class="verdict-box win"><strong>Verdict: SpaceATC 8.0 to 7.5.</strong> Better narrative clarity and demo proof. A single strong demo moment from AstroMesh could flip it.</div>
+</div>
+
+<!-- TAB 21: Equations Explained -->
+<div class="tab-pane" id="tab21">
+  <h3>🧮 Every Equation in Both Projects, in Plain English</h3>
+  <p><em>Written for a judge who has never seen an orbital-mechanics formula. Each block shows the real formula taken from the real source file, then what it actually means. Nothing here is paraphrased from a README — every line was read out of the code.</em></p>
+
+  <h4>The problem, before any math</h4>
+  <p>Two objects in orbit are moving at roughly 7.6 km per second each. If they are heading toward each other they close at up to ~14 km/s — about 40× rifle-bullet speed. Nobody can steer in real time at that speed, so everything must be predicted hours ahead. Both projects answer three questions: <strong>(1) when do they come closest?</strong> <strong>(2) how bad is it?</strong> <strong>(3) how small a nudge fixes it?</strong> They answer each one differently.</p>
+
+  <h4>Question 1 — When do they come closest? (Time of Closest Approach, "TCA")</h4>
+  <div class="eq alpha">
+    <span class="sym">TCA = argmin&#8202;<sub>t</sub> &#8741; r&#8321;(t) &minus; r&#8322;(t) &#8741;</span>
+    <span class="plain"><strong>SpaceATC.</strong> Read it as: "walk time forward, and find the moment where the gap between the two satellites is smallest." <code>r&#8321;(t)</code> and <code>r&#8322;(t)</code> are the two positions at time <em>t</em>; the double bars just mean "the distance between them." The code does it in two passes: a coarse pass stepping through time on a grid, then <code>scipy.optimize.minimize_scalar</code> zooming in on the winning window to find the exact second. This is a standard and correct way to do it.</span>
+    <span class="src">backend/orbital/conjunction.py:150–175</span>
+  </div>
+  <div class="eq beta">
+    <span class="sym">apogee/perigee sieve &rarr; 300&#8202;s coarse sweep &rarr; fine TCA refine</span>
+    <span class="plain"><strong>AstroMesh.</strong> Same goal, bigger scope. Before checking any pair it throws away pairs that <em>cannot possibly</em> meet: if one object's lowest altitude is above the other's highest altitude, skip it — no math needed. That "sieve" is what makes it affordable to screen a full ~31,000-object catalogue instead of one hand-picked pair. Survivors get a 5-minute-step sweep, then a fine refine. This is genuinely how real screening services do it.</span>
+    <span class="src">dev/mock-gateway.js:662–780</span>
+  </div>
+
+  <h4>Question 2 — How bad is it? (Probability of Collision, "Pc")</h4>
+  <p>A predicted miss distance is never exact — the tracking data is fuzzy. So instead of "they miss by 800 m", you ask "given the fuzziness, what is the chance they actually touch?" That number is <strong>Pc</strong>. Operators typically act at around 1 in 10,000 to 1 in 1,000,000. The two projects compute it in genuinely different ways, and this is the sharpest technical difference between them.</p>
+  <div class="eq alpha">
+    <span class="sym">Pc = (&pi; &middot; R&sup2; / &sigma;&sup2;) &middot; exp( &minus;&frac12; &middot; (d / &sigma;)&sup2; )&nbsp;&nbsp;&nbsp;with &sigma; = 1.0&#8202;km, R = 0.01&#8202;km</span>
+    <span class="plain"><strong>SpaceATC.</strong> Picture a dartboard. <code>d</code> is how far the dart lands from the bullseye (the miss distance). <code>R</code> is the size of the bullseye (both satellites' combined body size, ~10 m). <code>&sigma;</code> ("sigma") is how shaky the thrower's hand is — the uncertainty. The <code>exp(&minus;&frac12;(d/&sigma;)&sup2;)</code> part is the bell curve: the chance falls off very fast as the miss grows. <strong>The honest catch, which the code states in a comment:</strong> tracking data (TLEs) carries no uncertainty figure at all, so the team <em>assumed</em> &sigma; = 1&#8202;km. That is a defensible typical value, but it is an assumption, and the Pc is only as good as that guess. Judges should credit the comment that admits it.</span>
+    <span class="src">backend/orbital/conjunction.py:186–197</span>
+  </div>
+  <div class="eq beta">
+    <span class="sym">Pc<sub>max</sub> = HBR&sup2; / (d&sup2; &middot; e)&nbsp;&nbsp;&nbsp;&nbsp;&sigma;* = d / &radic;2</span>
+    <span class="plain"><strong>AstroMesh.</strong> Same missing-uncertainty problem, a cleverer dodge. Rather than guess &sigma;, ask: "of every possible uncertainty, which one makes this look <em>worst</em>?" That worst case turns out to be &sigma; = d/&radic;2 (the "dilution threshold"), and plugging it in collapses the whole bell curve into one clean line: <code>HBR&sup2; / (d&sup2; &middot; e)</code>, where <code>e</code> is Euler's number (2.718). So the answer is a guaranteed upper bound rather than a guess: "it is <em>at most</em> this risky." This is exactly the method CelesTrak's SOCRATES service publishes, which makes it more defensible than an assumed sigma. Credit where due — this is AstroMesh's strongest single piece of math.</span>
+    <span class="src">dev/mock-gateway.js:676–689</span>
+  </div>
+
+  <h4>Question 3 — How small a nudge fixes it? (Delta-V)</h4>
+  <p><strong>Delta-v</strong> is just "change in speed", measured in metres per second. It is the currency of spaceflight: every m/s spent is fuel burned, and fuel is finite and unreplaceable — spend too much and the satellite's working life gets shorter. So the goal is never "dodge hard", it is "dodge by the smallest amount that is provably safe."</p>
+  <div class="eq alpha">
+    <span class="sym">along-track coefficient = ( 4&#8202;sin(n&tau;) &minus; 3&#8202;n&tau; ) / n</span>
+    <span class="plain"><strong>SpaceATC (Clohessy&ndash;Wiltshire).</strong> <code>n</code> is how fast the satellite sweeps around its orbit, <code>&tau;</code> is how long before the encounter you fire the thruster. The formula answers: "if I nudge my speed <em>now</em>, how far ahead or behind my old track will I be at the encounter?" Two useful things fall out of it. First, the leverage is enormous — nudging early moves you kilometres later for centimetres per second now, which is why avoidance manoeuvres are tiny. Second, <strong>the sign flips</strong>: with a 60-minute lead, <code>n&tau; &asymp; 3.95</code> radians, past &pi;, so speeding up actually puts you <em>behind</em> where you wanted — the code correctly picks a <em>retrograde</em> (slow-down) burn. That sign check is a real detail most hackathon projects get wrong. The final number is then found by binary search: shrink the burn until the Pc is safe, and refuse to return anything outside 0.001–500 m/s or above Pc 1e-4.</span>
+    <span class="src">backend/orbital/conjunction.py:210–380</span>
+  </div>
+  <div class="eq beta">
+    <span class="sym">F(&chi;) = (v<sub>r0</sub>/&radic;&mu;)&#8202;&chi;&sup2;C(z) + (1&minus;&alpha;r&#8320;)&#8202;&chi;&sup3;S(z) + r&#8320;&chi; &minus; &radic;&mu;&#8202;&Delta;t = 0</span>
+    <span class="plain"><strong>AstroMesh (universal-variable Kepler with Stumpff functions).</strong> This looks frightening; the idea is not. SpaceATC's CW formula assumes a near-circular orbit and a nearby partner — fine for the demo, wrong for stretched orbits. This equation is the general version: one formula that fast-forwards <em>any</em> orbit — circular, elliptical, even escape trajectories — by any amount of time. <code>&chi;</code> ("chi") is a bookkeeping variable that stands in for "how far along the orbit we went", solved by Newton's method (guess, correct, repeat, ~200 iterations max). <code>C(z)</code> and <code>S(z)</code> are the Stumpff functions, the two helper series that keep the same formula valid whether the orbit curves closed or open. Practical payoff: after planning a dodge, AstroMesh can re-fly the new orbit and re-screen it against the whole catalogue to check the fix did not create a <em>second</em> conjunction. That closed loop is real engineering value.</span>
+    <span class="src">dev/mock-gateway.js:830–860</span>
+  </div>
+
+  <h4>The non-orbital jargon, decoded</h4>
+  <div class="glossary"><dl>
+    <dt>SGP4</dt><dd>The standard formula the US Space Force publishes for turning a satellite's tracking record into "where will it be at 14:32 tomorrow." Both projects use it. Neither wrote it — both use the well-tested library version, which is the correct choice.</dd>
+    <dt>LangGraph (SpaceATC)</dt><dd>A framework for wiring AI agents into a flowchart that can <em>stop mid-way</em>, wait for a human to click approve, and pick up exactly where it left off. That pause-and-resume is the technically hard part and is why the human-approval step is real rather than cosmetic.</dd>
+    <dt>Bully election / 2-Phase Commit (AstroMesh)</dt><dd>Rules for a group of computers with no boss. "Bully election": whoever has the highest ID declares itself leader. "2-Phase Commit": the leader asks everyone "can you do this?", and only if all say yes does it say "do it now." Standard, well-understood distributed-systems building blocks.</dd>
+    <dt>TLA+ (AstroMesh)</dt><dd>A language for <em>proving</em> a design cannot misbehave, rather than testing and hoping. Think of proving a traffic light can never show green both ways, instead of watching the intersection for a week. AstroMesh ships a real 8&#8202;KB specification. Note the boundary: TLA+ proves the <em>design</em>, not the code that was actually written.</dd>
+    <dt>Hard-body radius (HBR)</dt><dd>Both satellites treated as spheres and added together — roughly 10 m combined. It is the size of the target you are trying not to hit.</dd>
+  </dl></div>
+
+  <div class="verdict-box"><strong>Fair read on the math:</strong> AstroMesh's math is broader and more defensible (worst-case Pc bound, general-orbit propagation, full-catalogue screening with a re-check loop). SpaceATC's math is narrower but correct within its stated scope, and it is unusually honest about its one weak assumption. A judge who values rigour should score AstroMesh higher here; a judge who values "knows exactly where its own limits are" should note SpaceATC writes those limits into the code comments rather than hiding them.</div>
+</div>
+
+<!-- TAB 22: Verified Evidence -->
+<div class="tab-pane" id="tab22">
+  <h3>🔎 Verified Evidence &mdash; things checked in the source, not taken from a README</h3>
+  <p><em>Every claim below was confirmed by opening the file. File and line are given so any judge can check it in ten seconds. This section exists because both READMEs make claims that the code either supports or does not.</em></p>
+
+  <h4>Finding 1 &mdash; AstroMesh's deployed demo does not run the Go cluster</h4>
+  <div class="fact">
+    AstroMesh's headline is a <em>distributed, trustless, formally-verified</em> cluster: four Go nodes, Bully leader election, 2-phase-commit voting, a TLA+ proof. That Go code is real and is in the repo (<code>consensus.go</code>, <code>election.go</code>, <code>membership.go</code>, <code>formal/AstroMesh.tla</code>).<br><br>
+    But the deploy config launches something else. <code>render.yaml</code> line 9 reads <code>startCommand: node dev/mock-gateway.js</code>. The Go <code>Dockerfile</code> is present but is not the deployed service. The file that <em>does</em> run describes itself, in its own header comment, as: <code>"Simulates the full 4-node AstroMesh cluster with Bully election + 2PC consensus."</code><br><br>
+    And inside that simulation, each node's vote is: <code>const voteYes = conj.risk_index &gt; 40 || Math.random() &lt; 0.70;</code> &mdash; a threshold check with a 70% coin flip, inside one process. Not four machines agreeing.
+    <span class="src">render.yaml:9 &middot; dev/mock-gateway.js:4, 404–433</span>
+  </div>
+  <p><strong>How a fair judge should weigh this.</strong> It is not fraud and it should not be called that: shipping a simulator so the demo is reliable on conference wifi is a normal, defensible hackathon decision, and the real Go implementation exists to be shown. But it does change two scores. The consensus is <em>demonstrated</em>, not <em>running</em>, so "distributed systems executed" is weaker than the README implies. And if a judge asks "is the cluster live right now?", the honest answer is no &mdash; a team that has not rehearsed that answer will look worse in Q&amp;A than the truth deserves.</p>
+
+  <h4>Finding 2 &mdash; the orbital math sits in the JavaScript, not the Go</h4>
+  <div class="fact">
+    Every piece of AstroMesh's strongest technical work &mdash; the catalogue sieve, the SOCRATES-style maximum-Pc bound, the Stumpff/universal-variable Kepler propagator &mdash; lives in <code>dev/mock-gateway.js</code>. The Go files handle consensus, database, websocket, membership; <code>grep</code> for conjunction math in <code>*.go</code> returns SQL queries and risk-index reads, not propagation.
+    <span class="src">dev/mock-gateway.js:662–860 vs agent.go:38–90</span>
+  </div>
+  <p>This does not make the math worse &mdash; it is the same math wherever it is typed, and it is good math. It does mean the project is best described as "a strong Node orbital-screening service, plus a separate Go consensus demo," rather than one integrated distributed system. Judges evaluating <em>integration</em> should score accordingly; judges evaluating <em>algorithmic depth</em> should not dock it at all.</p>
+
+  <h4>Finding 3 &mdash; SpaceATC's honesty is verifiable, and so are its limits</h4>
+  <div class="fact">
+    SpaceATC's Pc assumption is not buried: <code>conjunction.py:186</code> carries the comment <em>"Real Pc needs covariance matrices (Akella-Alfriend 2000). Since TLEs don't carry covariance, we use assumed sigma = 1.0 km."</em> Its <code>STATE.md</code> similarly states in writing that CelesTrak often 403s and the backend falls back to a bundled cached TLE file, and that <code>/health</code> exposes <code>data_source: "live" | "cache"</code> so the fallback is visible rather than silent. The OrbitMind vision demo is labelled a replay of precomputed frames, not a live camera.
+    <span class="src">backend/orbital/conjunction.py:186–197 &middot; STATE.md</span>
+  </div>
+  <p>The mirror image of Finding 1: SpaceATC's weaknesses are pre-declared, which removes their sting in Q&amp;A but also means a judge reading carefully will find the ad-hoc sigma and the cached-TLE fallback. Both are real limitations. The difference is that nothing here contradicts the README.</p>
+
+  <div class="verdict-box"><strong>Net effect on the panel result:</strong> these findings do not overturn the aggregate &mdash; they reinforce it along the axis that already decided it. AstroMesh's ambition outruns what is running; SpaceATC's claims and its running system match. Where AstroMesh is genuinely ahead (screening breadth, Pc rigour, visual polish) it is ahead on the strength of code that really is there, and the scoreboard already credits it in tabs 5, 7 and 13.</div>
+</div>
+
+</div><!-- close tab-content -->
+
+<div style="text-align:center;padding:32px 0 16px;border-top:1px solid var(--border);margin-top:32px;color:var(--text2);font-size:.82rem;">
+  <p>FAR AWAY 2026 — Judge Panel Report · Generated autonomously from source code analysis of both repos</p>
+  <p style="margin-top:4px;">🚀 20 judge personas evaluated SpaceATC (rishet11/spaceatc) vs AstroMesh (Harp404/Space) on identical criteria</p>
+</div>
+</div>
+
+<script>
+const buttons = document.querySelectorAll('.tabs button');
+const panes = document.querySelectorAll('.tab-pane');
+buttons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    buttons.forEach(b => b.classList.remove('active'));
+    panes.forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab'+btn.dataset.tab).classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

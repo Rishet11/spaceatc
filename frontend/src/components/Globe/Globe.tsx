@@ -1,30 +1,14 @@
-import React, { useMemo, useRef, useEffect } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import React, { useMemo, useRef, useEffect, Suspense } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Html, Line } from '@react-three/drei';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import { SatelliteLayer, geodeticToThreeJS } from './SatelliteLayer';
-import { ConjunctionMarker } from './ConjunctionMarker';
 import { ConjunctionPaths } from './ConjunctionPaths';
 import { CollisionExplosion } from './CollisionExplosion';
+import { CameraDirector } from './CameraDirector';
+import { EarthGlobe, Atmosphere, Clouds } from './EarthMaterial';
 import { useSpaceStore } from '../../store/useSpaceStore';
-
-const EARTH_RADIUS = 1.0;
-const EARTH_TEXTURE_URL =
-  'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg';
-
-// Earth sphere with texture
-const Earth = () => {
-  const texture = useMemo(
-    () => new THREE.TextureLoader().load(EARTH_TEXTURE_URL),
-    []
-  );
-  return (
-    <mesh>
-      <sphereGeometry args={[EARTH_RADIUS, 64, 64]} />
-      <meshPhongMaterial map={texture} color="#ffffff" />
-    </mesh>
-  );
-};
 
 // Starfield — 1000 random stars, single draw call
 function Starfield() {
@@ -63,11 +47,24 @@ function ConjunctionZone() {
   const satellites = useSpaceStore((s) => s.satellites);
   const resolvedEvent = useSpaceStore((s) => s.resolvedEvent);
 
+  // The REST poll's ConjunctionEvent.status doesn't always flip away from
+  // 'detected' the instant a decision lands, which otherwise pinned this
+  // component on the stale pre-maneuver "MISS AT TCA" label forever.
+  // decisionOutcome would be the obvious signal but OutcomeOverlay.tsx clears
+  // it from the store only 3.6s after it's set, well before the backend's
+  // 'maneuver_executed' broadcast (and this poll) typically catches up —
+  // so match on resolvedEvent's satellite pair instead, which has no such
+  // short timeout.
   const activePair = activeConjunctions.find(
     (c) =>
-      c.status === 'detected' ||
-      c.status === 'negotiating' ||
-      c.status === 'pending_hitl'
+      (c.status === 'detected' ||
+        c.status === 'negotiating' ||
+        c.status === 'pending_hitl') &&
+      !(
+        resolvedEvent &&
+        ((c.sat_primary === resolvedEvent.satA && c.sat_secondary === resolvedEvent.satB) ||
+          (c.sat_primary === resolvedEvent.satB && c.sat_secondary === resolvedEvent.satA))
+      )
   );
 
   const satA_id = activePair ? activePair.sat_primary : resolvedEvent ? resolvedEvent.satA : null;
@@ -219,29 +216,6 @@ function ConjunctionZone() {
   );
 }
 
-// CameraController — auto-zoom toward conjunction midpoint
-function CameraController() {
-  const { camera } = useThree();
-  const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
-
-  const activePair = activeConjunctions.find(
-    (c) =>
-      c.status === 'detected' ||
-      c.status === 'negotiating' ||
-      c.status === 'pending_hitl'
-  );
-
-  useFrame(() => {
-    // Only animate the camera's distance from the center, preserving the user's manual rotation angles.
-    const currentDist = camera.position.length();
-    const targetDist = activePair ? 2.8 : 4.0;
-    const newDist = THREE.MathUtils.lerp(currentDist, targetDist, 0.02);
-    camera.position.setLength(newDist);
-  });
-
-  return null;
-}
-
 // Globe — main component
 export const Globe: React.FC = () => {
   const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
@@ -256,31 +230,41 @@ export const Globe: React.FC = () => {
         c.status === 'pending_hitl'
     );
 
+  const controlsRef = useRef<any>(null);
+
   return (
     <div className="absolute inset-0 bg-black">
       <Canvas
         camera={{ position: [0, 0, 4.0], fov: 45 }}
         style={{ width: '100%', height: '100%' }}
       >
-        <ambientLight intensity={0.2} />
+        <ambientLight intensity={0.15} />
         <directionalLight position={[5, 3, 5]} intensity={1.5} />
 
         <Starfield />
-        <Earth />
+        <Suspense fallback={null}>
+          <EarthGlobe />
+          <Clouds />
+        </Suspense>
+        <Atmosphere />
         <SatelliteLayer />
-        <ConjunctionMarker />
         <ConjunctionPaths />
         <ConjunctionZone />
         <CollisionExplosion />
-        <CameraController />
+        <CameraDirector controlsRef={controlsRef} />
 
         <OrbitControls
+          ref={controlsRef}
           enablePan={false}
           minDistance={1.2}
           maxDistance={10}
           autoRotate={!eventActive}
           autoRotateSpeed={0.3}
         />
+
+        <EffectComposer>
+          <Bloom luminanceThreshold={0.8} intensity={0.6} mipmapBlur />
+        </EffectComposer>
       </Canvas>
     </div>
   );

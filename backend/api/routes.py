@@ -2,11 +2,14 @@
 backend/api/routes.py — REST API routes (PRD Section 7).
 """
 
+import math
 import uuid
 import json
 import logging
 import time as time_module
 from datetime import datetime, timezone, timedelta
+
+import numpy as np
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -15,13 +18,19 @@ from backend.db.store import (
     get_all_conjunctions,
     get_conjunction,
     get_session_for_event,
+    get_proposals_for_event,
     upsert_satellite,
     update_conjunction_status
 )
 from backend.agents.graph import run_pipeline, resume_after_hitl
 from backend.api.schemas import MetricsResponse
-from backend.orbital.propagator import propagate_at, eci_to_geodetic
+from backend.orbital.propagator import propagate_at, propagate_two_body, eci_to_geodetic
 from sgp4.api import Satrec
+
+# Seconds between injecting the demo pair and their closest approach. Also
+# returned to the frontend so it can pace the countdown. Long enough to narrate
+# the detection and negotiation, short enough that the encounter stays on screen.
+ENCOUNTER_LEAD_S: int = 180
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -181,12 +190,113 @@ async def get_conjunction_paths(event_id: str):
     if not primary_pts or not secondary_pts:
         raise HTTPException(status_code=404, detail="Propagation produced no points")
 
-    return {
+    payload = {
         "event_id": event_id,
         "tca": tca.isoformat(),
         "tca_index": tca_index,
         "primary": {"name": name_primary, "points": primary_pts},
         "secondary": {"name": name_secondary, "points": secondary_pts},
+    }
+
+    post = await _post_maneuver_track(event_id, offsets, tca, _find_satrec)
+    if post is not None:
+        payload["post_maneuver"] = post
+    return payload
+
+
+async def _post_maneuver_track(event_id, offsets, tca, find_satrec):
+    """The maneuvering satellite's real trajectory after the winning burn.
+
+    Method, and its limits, stated plainly because we quote this on camera:
+
+    1. Take the *real* SGP4 state (r, v) at the burn epoch.
+    2. Apply the winning proposal's delta-V as an impulse along the velocity
+       vector -- which is exactly the along-track impulse the Clohessy-Wiltshire
+       solver sized, so the drawing and the arithmetic agree.
+    3. Propagate the burned and un-burned states forward with the same two-body
+       model and take the DIFFERENCE, then add that difference to the real SGP4
+       track.
+
+    Step 3 is the important one. Two-body propagation drifts from SGP4 by ~16 km
+    over 30 minutes because it ignores J2 and drag -- far more than the ~3 km the
+    maneuver itself buys. Propagating the post-burn state absolutely would bury
+    the signal in model error. Differencing two two-body runs that start 0.24 m/s
+    apart cancels that shared error almost entirely, leaving just the effect of
+    the burn, which is then applied to the trajectory SGP4 actually predicts.
+
+    Returns None when there is no winning proposal yet (pre-decision), or when
+    propagation fails. Displacements are in kilometres, true scale, unexaggerated.
+    """
+    proposals = await get_proposals_for_event(event_id)
+    if not proposals:
+        return None
+    winner = proposals[0]          # ORDER BY bid_score ASC -- lowest cost wins
+
+    satrec = find_satrec(winner["satellite_name"])
+    if satrec is None:
+        return None
+
+    try:
+        burn_time = datetime.fromisoformat(winner["burn_time"])
+    except (KeyError, ValueError):
+        return None
+    if burn_time.tzinfo is None:
+        burn_time = burn_time.replace(tzinfo=timezone.utc)
+
+    r_burn, v_burn = propagate_at(satrec, burn_time)
+    if r_burn is None or v_burn is None:
+        return None
+    # propagate_at hands back plain sequences; the vector arithmetic below needs arrays.
+    r_burn = np.asarray(r_burn, dtype=float)
+    v_burn = np.asarray(v_burn, dtype=float)
+
+    speed = float(np.linalg.norm(v_burn))
+    if speed <= 0:
+        return None
+    # Retrograde burns slow the craft down, so the impulse opposes velocity.
+    sign = -1.0 if winner["burn_direction"] == "retrograde" else 1.0
+    dv_km_s = winner["delta_v_ms"] / 1000.0
+    v_burned = v_burn + sign * dv_km_s * (v_burn / speed)
+
+    points, max_sep_km = [], 0.0
+    for off in offsets:
+        t = tca + timedelta(seconds=off)
+        nominal, _ = propagate_at(satrec, t)
+        if nominal is None:
+            continue
+        nominal = np.asarray(nominal, dtype=float)
+        if t <= burn_time:
+            pos = nominal                      # burn has not happened yet
+        else:
+            try:
+                base, _ = propagate_two_body(r_burn, v_burn, burn_time, t)
+                bent, _ = propagate_two_body(r_burn, v_burned, burn_time, t)
+            except ValueError:
+                return None
+            displacement = bent - base
+            max_sep_km = max(max_sep_km, float(np.linalg.norm(displacement)))
+            pos = nominal + displacement
+        lat, lon, alt = eci_to_geodetic(pos, t)
+        points.append({"lat": lat, "lon": lon, "alt_km": alt})
+
+    if not points:
+        return None
+    return {
+        "satellite": winner["satellite_name"],
+        "delta_v_ms": winner["delta_v_ms"],
+        "burn_direction": winner["burn_direction"],
+        "burn_time": burn_time.isoformat(),
+        # Peak true separation from the original track, so the client can decide
+        # how much to exaggerate it to make a few km legible on a 6371 km globe.
+        # NOTE: this is displacement from where the satellite *would have been*,
+        # NOT the miss distance to the other object. They are different numbers
+        # (4.2 km vs 3.4 km here) and must not be shown interchangeably.
+        "max_separation_km": max_sep_km,
+        # Miss distance to the other satellite after the burn -- the number that
+        # belongs next to "before" in any user-facing before/after readout.
+        "post_maneuver_miss_km": winner["post_maneuver_miss_km"],
+        "post_maneuver_pc": winner["post_maneuver_pc"],
+        "points": points,
     }
 
 @router.get("/api/metrics")
@@ -276,31 +386,78 @@ def generate_conjunction_tle_pair(epoch_dt: datetime) -> tuple[tuple[str, str, s
     # Format: YY + day_frac (000.00000000 format, total 14 characters)
     epoch_str = f"{year_str}{day_frac:012.8f}"
     
-    # Base elements:
-    inc = "53.0500"
-    raan_a = 0.0
+    # ------------------------------------------------------------------
+    # Two DIFFERENT orbital planes that genuinely intersect.
+    # ------------------------------------------------------------------
+    # A same-plane pair (which this used to be) has coincident ground
+    # tracks, so on a globe the two trajectories draw over each other and
+    # read as a single line -- and a co-orbital encounter is the *benign*
+    # kind, closing at ~1 km/s.  The dangerous, and visually legible, case
+    # is a crossing encounter between different planes: Iridium-Cosmos
+    # closed at 11.7 km/s.  Sat A sits in a Starlink-like 53.05 deg shell;
+    # sat B crosses it from a 74 deg plane with its node on the far side,
+    # giving a ~13.7 km/s head-on geometry.
+    #
+    # Rather than hardcode mean anomalies (which would only be correct for
+    # one epoch), we solve for them: the two orbit planes intersect along
+    # d = n_A x n_B, and we phase each satellite so it arrives at that
+    # intersection ENCOUNTER_LEAD_S after the epoch.  SGP4 then finds the
+    # real TCA -- we place the geometry, we do not fake the result.
+    inc_a, raan_a = 53.05, 0.0
+    inc_b, raan_b = 74.0, 179.981667
     ecc = "0001000"
     argp = 0.0
-    ma_a = 0.0
-    # Same orbital shell for both satellites: two co-orbital craft need an
-    # essentially symmetric avoidance delta-V (real physics). The negotiation
-    # winner is therefore decided by operational cost (maneuver history / fuel),
-    # not by an artificial delta-V difference. See demo_inject / tle_ingestion.
     mm = "15.30000000"
+    mm_rev_day = 15.30000000
+
+    # Small empirical phase bias on B.  Mean anomaly is not exactly the
+    # argument of latitude (eccentricity is small but nonzero) and SGP4
+    # applies J2 over the lead time, so the analytic placement lands a few
+    # km off a dead-centre hit.  This bias tunes the encounter to a
+    # ~0.4-0.5 km miss: close enough to clear the Pc alert threshold,
+    # far enough to be a near miss rather than a contact.
+    ma_b_bias = 0.219964
+
+    def plane_normal(inc_deg: float, raan_deg: float):
+        i, om = math.radians(inc_deg), math.radians(raan_deg)
+        return [math.sin(i) * math.sin(om), -math.sin(i) * math.cos(om), math.cos(i)]
+
+    def arg_of_lat(d, inc_deg: float, raan_deg: float) -> float:
+        """Argument of latitude (deg) of direction `d` within the given plane."""
+        om = math.radians(raan_deg)
+        node = [math.cos(om), math.sin(om), 0.0]          # ascending node
+        w = plane_normal(inc_deg, raan_deg)
+        perp = [                                           # 90 deg past the node
+            w[1] * node[2] - w[2] * node[1],
+            w[2] * node[0] - w[0] * node[2],
+            w[0] * node[1] - w[1] * node[0],
+        ]
+        dot = lambda p, q: sum(x * y for x, y in zip(p, q))  # noqa: E731
+        return math.degrees(math.atan2(dot(d, perp), dot(d, node))) % 360.0
+
+    na, nb = plane_normal(inc_a, raan_a), plane_normal(inc_b, raan_b)
+    d = [
+        na[1] * nb[2] - na[2] * nb[1],
+        na[2] * nb[0] - na[0] * nb[2],
+        na[0] * nb[1] - na[1] * nb[0],
+    ]
+    dnorm = math.sqrt(sum(x * x for x in d)) or 1.0
+    d = [x / dnorm for x in d]
+
+    # Degrees of mean anomaly swept during the lead time.
+    sweep_deg = mm_rev_day * 360.0 / 86400.0 * ENCOUNTER_LEAD_S
+    ma_a = (arg_of_lat(d, inc_a, raan_a) - sweep_deg) % 360.0
+    ma_b = (arg_of_lat(d, inc_b, raan_b) - sweep_deg + ma_b_bias) % 360.0
 
     def format_angle(deg):
-        return f"{deg:8.4f}".rjust(8, ' ')
+        return f"{deg % 360.0:8.4f}".rjust(8, ' ')
 
     line1_a = f"1 99001U 24001A   {epoch_str}  .00000000  00000-0  00000-0 0  9999"
-    line2_a = f"2 99001  {inc} {format_angle(raan_a)} {ecc} {format_angle(argp)} {format_angle(ma_a)} {mm}    00"
-
-    raan_b = raan_a + 0.01
-    ma_b = ma_a - 0.005
-    if ma_b < 0: ma_b += 360.0
+    line2_a = f"2 99001  {inc_a:7.4f} {format_angle(raan_a)} {ecc} {format_angle(argp)} {format_angle(ma_a)} {mm}    00"
 
     line1_b = f"1 99002U 24001B   {epoch_str}  .00000000  00000-0  00000-0 0  9999"
-    line2_b = f"2 99002  {inc} {format_angle(raan_b)} {ecc} {format_angle(argp)} {format_angle(ma_b)} {mm}    00"
-    
+    line2_b = f"2 99002  {inc_b:7.4f} {format_angle(raan_b)} {ecc} {format_angle(argp)} {format_angle(ma_b)} {mm}    00"
+
     return ("DEMO-SAT-A", line1_a, line2_a), ("DEMO-SAT-B", line1_b, line2_b)
 
 @router.post("/api/demo/inject")
@@ -373,7 +530,7 @@ async def demo_inject():
             "detail": "Pipeline ran but no conjunction was detected.",
         }
 
-    return {"status": "injected", "event_id": event_id, "expected_tca_seconds": 120}
+    return {"status": "injected", "event_id": event_id, "expected_tca_seconds": ENCOUNTER_LEAD_S}
 
 @router.post("/api/hitl/{event_id}/approve")
 async def hitl_approve(event_id: str):

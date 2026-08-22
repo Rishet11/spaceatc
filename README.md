@@ -18,6 +18,31 @@ Multi-agent autonomous satellite collision avoidance negotiation system.
 
 > **🔴 Live demo:** https://huggingface.co/spaces/Rishet11/spaceatc
 
+---
+
+### Two satellites on a collision course, and the maneuver that resolves it
+
+![Conjunction detected](docs/img/01-conjunction-detected.png)
+
+A real conjunction between two satellites in **different orbital planes** (53.05° and 74.0°),
+closing head-on at **13.66 km/s** — the dangerous class of encounter, not a benign co-orbital
+drift. SGP4 finds the closest approach at **0.463 km**, collision probability **1 in 3,543**.
+Both operators bid an avoidance burn; the coordinator picks the one with the lower operational
+cost, and the graph halts for human authorization.
+
+![Maneuver resolved](docs/img/02-maneuver-resolved.png)
+
+Approved: a **0.242 m/s retrograde** burn takes the miss distance to **3.391 km** and the risk to
+**1 in 999,999**. The green trajectory is the real post-burn orbit — the actual SGP4 state at the
+burn epoch with the computed ΔV applied as an impulse — not an animation. Its separation is
+amplified on screen (and labelled as such) because 4 km on a 6,371 km globe is invisible.
+
+![Live constellation](docs/img/03-live-constellation.png)
+
+Idle state: the live Starlink constellation, propagated with SGP4 from current TLEs.
+
+---
+
 ## 🚀 Problem
 
 SpaceX launched the Stargaze tracking system on January 29, 2026. It collects 30 million object observations per day across the Starlink fleet, generating Conjunction Data Messages (CDMs) and sending them to operators in minutes instead of hours.
@@ -33,7 +58,7 @@ SpaceATC fills the uncoordinated handoff gap with **two layers of autonomy**:
 
 **Layer 1 — Ground Negotiation (multi-agent + HITL).** A LangGraph agent system that automatically coordinates maneuver decisions between competing satellite operators. Using true orbital physics (SGP4 and Clohessy-Wiltshire relative-motion equations), independent per-operator agents each propose and score an avoidance burn (delta-V); a coordinator selects the winner on a *real* cost signal (fuel + maneuver history), not an arbitrary tiebreak. The graph **interrupts** for Human-In-The-Loop approval and **checkpoints its state to SQLite** so it survives the pause — genuine agentic orchestration, not a single prompt. A real-time, WebGL 3D globe renders the live constellation and the SGP4-propagated conjunction tracks.
 
-**Layer 2 — OrbitMind Onboard Reflex (vision-based proximity operations).** A satellite-side perception to decision loop for close-proximity encounters: **YOLO26** detects the target and **MobileNetV3** regresses its **6-DOF metric pose** (via the ESA SPEED+ camera model), feeding an onboard decision engine that classifies the range band deterministically, reasons over a retrieval-grounded evasion playbook (LLM+RAG), and emits a thruster command **validated against a deterministic safety envelope** so the model never commands thrusters directly. Demonstrated on the **ESA SPEED+ Tango spacecraft-proximity benchmark**.
+**Layer 2 — OrbitMind Onboard Reflex (vision-based proximity operations).** A satellite-side perception to decision loop for close-proximity encounters: **YOLO26** detects the target and **MobileNetV3** regresses its **6-DOF metric pose** (via the ESA SPEED+ camera model), feeding an onboard decision engine that classifies the range band deterministically, selects from a range-indexed evasion playbook and has an LLM explain the choice, and emits a thruster command **validated against a deterministic safety envelope** so the model never commands thrusters directly. Demonstrated on the **ESA SPEED+ Tango spacecraft-proximity benchmark**.
 
 ---
 

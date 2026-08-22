@@ -3,6 +3,17 @@ import { useSpaceStore } from '../../store/useSpaceStore';
 import { ShieldAlert, Check, X, Clock } from 'lucide-react';
 import { Tooltip } from '../Tooltip';
 
+// Seconds an operator has to review a proposed maneuver before it is
+// auto-vetoed. Auto-veto is a fail-safe, not a bypass: the LangGraph run is
+// halted at `interrupt_before=["await_hitl"]` and cannot execute a burn
+// without an explicit decision either way.
+//
+// Configurable because a live walkthrough narrates the numbers on this panel,
+// and a review window that expires mid-sentence would veto a maneuver the
+// operator was in the middle of approving. Whatever value is set here is the
+// value shown on screen and the value we quote.
+const REVIEW_WINDOW_S = Number(import.meta.env.VITE_HITL_TIMEOUT_S ?? 30);
+
 export const HITLPanel: React.FC = () => {
   const {
     currentHitlRequest,
@@ -16,7 +27,7 @@ export const HITLPanel: React.FC = () => {
     setPipelineStage,
     addToast,
   } = useSpaceStore();
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(REVIEW_WINDOW_S);
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // Guards re-entry from every source at once: double-click, the auto-veto
@@ -33,7 +44,7 @@ export const HITLPanel: React.FC = () => {
 
       inFlightRef.current = false;
       setSubmitting(false);
-      setTimeLeft(30);
+      setTimeLeft(REVIEW_WINDOW_S);
       // The interval only decrements. Firing the auto-veto from inside the
       // updater made it a side effect inside a state updater, which React
       // StrictMode double-invokes in development -- producing two veto POSTs.
@@ -157,12 +168,14 @@ export const HITLPanel: React.FC = () => {
   };
 
   const getTimerColor = () => {
-    if (timeLeft < 5) return 'bg-red-500';
-    if (timeLeft < 15) return 'bg-yellow-500';
+    // Thresholds are fractions of the window so the colour ramp reads the
+    // same whatever REVIEW_WINDOW_S is set to.
+    if (timeLeft < REVIEW_WINDOW_S / 6) return 'bg-red-500';
+    if (timeLeft < REVIEW_WINDOW_S / 2) return 'bg-yellow-500';
     return 'bg-green-500';
   };
 
-  const timerWidth = (timeLeft / 30) * 100;
+  const timerWidth = (timeLeft / REVIEW_WINDOW_S) * 100;
 
   const riskBeforeWidth = riskWidth(pc_before);
   const riskAfterWidth = riskWidth(pc_after);
@@ -186,7 +199,7 @@ export const HITLPanel: React.FC = () => {
             <span>MANEUVER AUTHORIZATION REQUIRED</span>
           </Tooltip>
         </div>
-        <div className={`flex items-center space-x-2 text-xl font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-gray-300'}`}>
+        <div className={`flex items-center space-x-2 text-xl font-bold ${timeLeft < REVIEW_WINDOW_S / 3 ? 'text-red-500 animate-pulse' : 'text-gray-300'}`}>
           <Clock className="w-5 h-5" />
           <span>{timeLeft}s</span>
         </div>
