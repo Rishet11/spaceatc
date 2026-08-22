@@ -213,3 +213,38 @@ def test_negotiation_malformed_text_none_does_not_raise():
     result = review_negotiation_rationale(None, "OperatorA", "OperatorB", 0.087)
     assert isinstance(result, ContentReview)
     assert result.passed is False
+
+
+# --- Regression guards: loser-proximity false positives (Round 2 bug) ---
+
+
+def test_negotiation_loser_named_in_comparison_passes():
+    """Naming the loser near a selection verb in a genuine comparison is
+    normal, correct English and must not be rejected."""
+    text = (
+        "Demo_A was chosen over Demo_B because, even though both maneuvers "
+        "required the same 0.242 m/s ΔV, Demo_A provided a larger fuel "
+        "margin, making it the more robust option."
+    )
+    result = review_negotiation_rationale(text, "Demo_A", "Demo_B", 0.242)
+    assert result.passed is True
+    assert result.reasons == []
+
+
+def test_negotiation_winner_name_underscore_vs_space_passes():
+    """LLM prose commonly writes 'Demo A' for the operator ID 'Demo_A'."""
+    text = "Demo A was chosen because it provided a larger fuel margin at 0.242 m/s."
+    result = review_negotiation_rationale(text, "Demo_A", "Demo_B", 0.242)
+    assert result.passed is True
+    assert result.reasons == []
+
+
+def test_negotiation_loser_directly_credited_still_fails():
+    """True positive: the loser is what's actually described as selected."""
+    text = (
+        "Demo_A proposed a burn, but Demo_B was ultimately selected for this "
+        "maneuver, burning 0.242 m/s."
+    )
+    result = review_negotiation_rationale(text, "Demo_A", "Demo_B", 0.242)
+    assert result.passed is False
+    assert any("Demo_B" in r for r in result.reasons)
