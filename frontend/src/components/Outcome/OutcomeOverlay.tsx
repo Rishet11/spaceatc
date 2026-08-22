@@ -46,9 +46,11 @@ export const OutcomeOverlay: React.FC = () => {
         }`}
       />
 
-      {/* Headline banner */}
+      {/* Headline banner. Constrained to a max-width and kept clear of the
+          top-left corner (where the resolution math card docks) so it never
+          runs into other on-screen overlays at narrow viewports. */}
       <div
-        className={`relative mt-28 animate-outcome-pop rounded-2xl border-2 px-10 py-6 backdrop-blur-md text-center shadow-2xl ${
+        className={`relative mt-28 mx-4 max-w-2xl animate-outcome-pop rounded-2xl border-2 px-6 py-4 sm:px-10 sm:py-6 backdrop-blur-md text-center shadow-2xl ${
           approved
             ? 'border-green-400 bg-green-950/80 shadow-[0_0_60px_rgba(34,197,94,0.5)]'
             : 'border-red-500 bg-red-950/80 shadow-[0_0_60px_rgba(239,68,68,0.6)]'
