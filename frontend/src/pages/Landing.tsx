@@ -92,6 +92,13 @@ export const Landing: React.FC = () => {
           <p className="text-xl text-gray-400 mt-4 max-w-2xl mx-auto">
             The coordination layer space was missing.
           </p>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="mt-10 z-10 bg-[#ef4444] hover:bg-red-500 text-white font-bold text-xl px-12 py-5 rounded-full shadow-lg transition-colors duration-200 flex items-center gap-3 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-300/60 mx-auto"
+          >
+            Launch SpaceATC
+            <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
+          </button>
         </div>
 
         {/* Hero Stats */}
