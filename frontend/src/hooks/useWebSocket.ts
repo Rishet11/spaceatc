@@ -72,7 +72,7 @@ export const useWebSocket = () => {
         setWsConnected(false);
         // Warn once per disconnect episode so reconnect attempts don't spam toasts.
         if (!warnedDisconnectRef.current) {
-          addToast('Live connection lost — reconnecting…', 'error');
+          addToast('Live connection lost, reconnecting…', 'error');
           warnedDisconnectRef.current = true;
         }
         timeoutRef.current = setTimeout(connectWs, backoff);

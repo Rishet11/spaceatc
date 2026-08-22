@@ -417,7 +417,7 @@ def compute_minimum_delta_v(input: ManeuverInput) -> ManeuverOutput:  # noqa: A0
         raise ValueError("Miss distance did not increase after maneuver")
 
     trace.append({"t": 15, "text": "CONVERGED", "value": f"ΔV = {delta_v_ms:.3f} m/s ({burn_direction})"})
-    trace.append({"t": 16, "text": "Post-maneuver Pc", "value": f"{final_pc:.2e} \u2014 SAFE ✓"})
+    trace.append({"t": 16, "text": "Post-maneuver Pc", "value": f"{final_pc:.2e}, SAFE ✓"})
     trace.append({"t": 17, "text": "Post-maneuver miss distance", "value": f"{final_miss:.3f} km"})
 
     return ManeuverOutput(

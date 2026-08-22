@@ -746,15 +746,15 @@ export const ReflexPanel: React.FC = () => {
               <div className="space-y-2 font-mono text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">X:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[0].toFixed(3) : "—"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[0].toFixed(3) : "-"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Y:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[1].toFixed(3) : "—"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[1].toFixed(3) : "-"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Z:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[2].toFixed(3) : "—"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[2].toFixed(3) : "-"}</span>
                 </div>
               </div>
             </div>
@@ -765,19 +765,19 @@ export const ReflexPanel: React.FC = () => {
               <div className="space-y-1 font-mono text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qw:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[0].toFixed(3) : "—"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[0].toFixed(3) : "-"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qx:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[1].toFixed(3) : "—"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[1].toFixed(3) : "-"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qy:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[2].toFixed(3) : "—"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[2].toFixed(3) : "-"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qz:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[3].toFixed(3) : "—"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[3].toFixed(3) : "-"}</span>
                 </div>
               </div>
             </div>
@@ -791,7 +791,7 @@ export const ReflexPanel: React.FC = () => {
                      distance === null ? "text-gray-500" : isEvading ? "text-red-500" : isWarning ? "text-amber-500" : "text-emerald-500"
                    }`}
                  >
-                   {distance === null ? "—" : `${distance.toFixed(2)} m`}
+                   {distance === null ? "-" : `${distance.toFixed(2)} m`}
                 </span>
               </div>
               {/* Range status bar */}
@@ -853,7 +853,7 @@ export const ReflexPanel: React.FC = () => {
               if (contentReview.used_fallback && reasons.length === 0) {
                 return (
                   <Tooltip
-                    text="No narrative was generated (model unavailable). Deterministic text is in use — this is not a review rejection."
+                    text="No narrative was generated (model unavailable). Deterministic text is in use. This is not a review rejection."
                     position="bottom"
                   >
                     <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border text-gray-400 bg-gray-950/30 border-gray-500/20 cursor-help">

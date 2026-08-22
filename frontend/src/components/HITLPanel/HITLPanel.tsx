@@ -130,7 +130,7 @@ export const HITLPanel: React.FC = () => {
         // Do not leave the UI asserting an outcome the backend never confirmed.
         console.error(`Failed to ${decision}`, e);
         addToast(
-          `Maneuver ${decision} failed — the backend did not confirm. Nothing was executed.`,
+          `Maneuver ${decision} failed: the backend did not confirm. Nothing was executed.`,
           'error'
         );
         setDecisionOutcome(null);
@@ -145,7 +145,7 @@ export const HITLPanel: React.FC = () => {
   actionRef.current = handleAction;
 
   const formatPcFraction = (pc: number | null) => {
-    if (pc === null) return "\u2014";
+    if (pc === null) return "-";
     if (pc <= 0) return "SAFE";
     return "1 in " + Math.round(1 / pc).toLocaleString();
   };
@@ -183,7 +183,7 @@ export const HITLPanel: React.FC = () => {
   // Real burn timestamp from the proposal instead of a hardcoded "60 min".
   const burnDate = new Date(proposal.burn_time);
   const burnLabel = isNaN(burnDate.getTime())
-    ? '\u2014'
+    ? '-'
     : `${burnDate.toISOString().slice(11, 16)} UTC`;
   const missBeforeKm = conj ? conj.miss_distance_km : null;
 
@@ -232,7 +232,7 @@ export const HITLPanel: React.FC = () => {
 
           <span className="text-gray-400">MISS DIST.</span>
           <span className="font-bold text-green-400 text-right">
-            {missBeforeKm !== null ? `${missBeforeKm.toFixed(2)}` : '—'}
+            {missBeforeKm !== null ? `${missBeforeKm.toFixed(2)}` : '-'}
             {' → '}
             {proposal.post_maneuver_miss_km.toFixed(2)} km
           </span>
@@ -258,10 +258,10 @@ export const HITLPanel: React.FC = () => {
             </div>
             <div className="flex-1 flex flex-col gap-0.5">
               <div className="text-red-400 text-[10px]">
-                <Tooltip text="Probability of Collision — how likely a physical impact is at closest approach. Industry alert threshold: 1 in 10,000 (1×10⁻⁴). We target below 1 in 1,000,000." position="top">
+                <Tooltip text="Probability of Collision: how likely a physical impact is at closest approach. Industry alert threshold: 1 in 10,000 (1×10⁻⁴). We target below 1 in 1,000,000." position="top">
                   <span className="border-b border-dashed border-red-800">Pc</span>
                 </Tooltip>
-                : {pc_before !== null ? pc_before.toExponential(2) : '—'}
+                : {pc_before !== null ? pc_before.toExponential(2) : '-'}
               </div>
               <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <div className="h-full bg-red-500" style={{ width: `${riskBeforeWidth}%` }}></div>
@@ -277,7 +277,7 @@ export const HITLPanel: React.FC = () => {
             </div>
             <div className="flex-1 flex flex-col gap-0.5">
               <div className="text-green-400 text-[10px]">
-                <Tooltip text="Probability of Collision — how likely a physical impact is at closest approach. Industry alert threshold: 1 in 10,000 (1×10⁻⁴). We target below 1 in 1,000,000." position="top">
+                <Tooltip text="Probability of Collision: how likely a physical impact is at closest approach. Industry alert threshold: 1 in 10,000 (1×10⁻⁴). We target below 1 in 1,000,000." position="top">
                   <span className="border-b border-dashed border-green-800">Pc</span>
                 </Tooltip>
                 : {pc_after.toExponential(2)}

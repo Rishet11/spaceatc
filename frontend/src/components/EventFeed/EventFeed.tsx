@@ -26,10 +26,10 @@ const BADGE_DOT: Record<string, string> = {
 
 const BADGE_TOOLTIPS: Record<string, string> = {
   'DETECTOR': "Orbital conjunction detection agent using SGP4 propagation and TCA optimization",
-  'COORDINATOR': "Contract-Net Protocol negotiation coordinator — manages bid collection and winner selection",
-  'OPERATOR': "Operator agent — computes minimum delta-V bid using Clohessy-Wiltshire equations",
-  'EXECUTOR': "Maneuver execution agent — applies approved burn and updates orbital state",
-  'HITL': "Human-In-The-Loop gate — final approval required before any satellite maneuver",
+  'COORDINATOR': "Contract-Net Protocol negotiation coordinator: manages bid collection and winner selection",
+  'OPERATOR': "Operator agent: computes minimum delta-V bid using Clohessy-Wiltshire equations",
+  'EXECUTOR': "Maneuver execution agent: applies approved burn and updates orbital state",
+  'HITL': "Human-In-The-Loop gate: final approval required before any satellite maneuver",
 };
 
 function parseBadge(message: string): string {

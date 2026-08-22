@@ -137,7 +137,7 @@ export const Landing: React.FC = () => {
           <div className="bg-white/5 p-10 rounded-3xl border border-white/10 font-mono text-sm relative">
             <div className="flex flex-col items-center space-y-6">
               <div className="bg-gray-800 border border-gray-600 px-6 py-3 rounded-lg text-white font-bold tracking-widest">
-                SpaceX Stargaze — Jan 2026
+                SpaceX Stargaze: Jan 2026
               </div>
               <ArrowDown className="text-gray-500 w-6 h-6" />
               <div className="text-[#4fc3f7] text-center max-w-[250px]">
@@ -169,7 +169,7 @@ export const Landing: React.FC = () => {
             <blockquote className="border-l-4 border-[#ef4444] pl-6 italic text-gray-500 leading-relaxed text-lg bg-red-950/10 py-4 pr-4 rounded-r-xl">
               "If the reaction required human approval, such an event might not have been successfully mitigated."
               <footer className="mt-4 text-sm text-gray-600 font-mono normal-case tracking-wider not-italic">
-                — SpaceX Stargaze announcement, Jan 29, 2026
+                SpaceX Stargaze announcement, Jan 29, 2026
               </footer>
             </blockquote>
           </div>

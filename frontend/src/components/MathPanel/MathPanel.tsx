@@ -78,7 +78,7 @@ export const MathPanel: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-xl text-red-400 line-through decoration-red-500/50">
-              {missBefore !== null ? `${missBefore.toFixed(3)} km` : '—'}
+              {missBefore !== null ? `${missBefore.toFixed(3)} km` : '-'}
             </span>
             <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />
             <span className="text-2xl font-bold text-green-400">
@@ -102,7 +102,7 @@ export const MathPanel: React.FC = () => {
           </Tooltip>
           <div className="flex items-baseline gap-2 text-[13px]">
             <span className="text-red-400">
-              {pcBefore !== null ? asOdds(pcBefore) : '—'}
+              {pcBefore !== null ? asOdds(pcBefore) : '-'}
             </span>
             <ChevronRight className="w-3.5 h-3.5 text-gray-500 shrink-0" />
             <span className="text-green-400 font-bold">{asOdds(pcAfter)}</span>

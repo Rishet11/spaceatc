@@ -14,12 +14,12 @@ const STAGE_INDEX: Record<PipelineStage, number> = {
 };
 
 const CAPTIONS: Record<PipelineStage, string> = {
-  idle: 'Monitoring tracked objects — no active conjunction',
+  idle: 'Monitoring tracked objects, no active conjunction',
   detected: 'Two satellites on a converging collision course',
   negotiating: 'Operators bidding to decide who maneuvers',
   awaiting: 'Awaiting human authorization for the avoidance maneuver',
-  resolved: 'Maneuver executed — collision avoided',
-  collision: 'Maneuver vetoed — collision occurred',
+  resolved: 'Maneuver executed, collision avoided',
+  collision: 'Maneuver vetoed, collision occurred',
 };
 
 function useStage(): PipelineStage {
