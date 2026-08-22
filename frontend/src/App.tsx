@@ -111,9 +111,13 @@ function Dashboard() {
           <ReflexPanel />
         </div>
       )}
-      <HITLPanel />
-      <MathPanel />
-      <OutcomeOverlay />
+      {activeTab === 'ground' && (
+        <>
+          <HITLPanel />
+          <MathPanel />
+          <OutcomeOverlay />
+        </>
+      )}
       <ToastHost />
     </div>
   );

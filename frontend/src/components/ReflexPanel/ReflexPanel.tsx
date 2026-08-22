@@ -14,7 +14,7 @@ import {
   Upload,
   Video
 } from 'lucide-react';
-import { SAFE_RANGE_M, WARNING_RANGE_M } from '../../constants/thresholds';
+import { SAFE_RANGE_M, WARNING_RANGE_M, FAR_RANGE_M, CLOSEST_RANGE_M } from '../../constants/thresholds';
 import { Tooltip } from '../Tooltip';
 
 interface FrameData {
@@ -314,18 +314,27 @@ export const ReflexPanel: React.FC = () => {
   // which made the dodge unreachable: the swept range only crosses into
   // CRITICAL at t > 0.795, putting satX above 766, while the offset branch
   // required satX <= 750. The satellite therefore never left the centerline,
-  // and the drawn S-curve sat entirely behind it.
+  // and the drawn S-curve sat entirely behind it. (Verified since fixed: at
+  // CRITICAL the satellite does leave the centerline — evadeAmount ramps from
+  // 0 at the WARNING threshold to 1 at closest approach.)
   //
-  // Everything below is now derived from the MEASURED range, so the marker and
-  // the path are always consistent and the maneuver is visible exactly when the
-  // safety check actually fires.
-  // ---------------------------------------------------------------------
-  const CLOSEST_RANGE_M = 0.6; // REPLAY_RANGE_NEAR_M
-
-  // How far through the approach we are (0 = first warning, 1 = closest point).
+  // A second bug remained: `approach` was measured from SAFE_RANGE_M (2.2 m)
+  // down to CLOSEST_RANGE_M, but the replay sweep (and most real footage)
+  // starts around 5.0 m. Measured against the live backend
+  // (curl /api/reflex/frame/N?mode=replay for N=1..99 on 2026-08-22/23):
+  // distance ran ~4.96 m -> 0.60 m across all 100 frames, yet frames 1-60
+  // (60% of the clip) stayed at distance >= 2.33 m, i.e. >= SAFE_RANGE_M, so
+  // `approach` was clamped to 0 for that entire span and both markers sat
+  // frozen at the left edge. Only the last ~40 frames (distance < 2.2 m)
+  // produced any motion. Rebasing `approach` on the clip's actual far range
+  // (~5.0 m, matching backend REPLAY_RANGE_FAR_M in
+  // backend/api/reflex_playbook.py) makes the satellite traverse the whole
+  // panel as the whole clip plays, while the evasion offset stays keyed to
+  // the WARNING/CRITICAL band via `evadeAmount` below.
+  // How far through the approach we are (0 = far edge of the sweep, 1 = closest point).
   const approach = distance === null ? 0 : Math.max(
     0,
-    Math.min(1, (SAFE_RANGE_M - distance) / (SAFE_RANGE_M - CLOSEST_RANGE_M))
+    Math.min(1, (FAR_RANGE_M - distance) / (FAR_RANGE_M - CLOSEST_RANGE_M))
   );
   // How committed the evasion is (0 at the CRITICAL threshold, 1 at closest).
   const evadeAmount = distance === null ? 0 : Math.max(
@@ -340,8 +349,10 @@ export const ReflexPanel: React.FC = () => {
   const satY = 88 - offset;
 
   // x at which the evasion departs the nominal corridor (the CRITICAL crossing).
+  // Must use the same far bound as `approach` above so this lines up with the
+  // x the satellite marker actually reaches when distance crosses WARNING_RANGE_M.
   const critX =
-    50 + ((SAFE_RANGE_M - WARNING_RANGE_M) / (SAFE_RANGE_M - CLOSEST_RANGE_M)) * 900;
+    50 + ((FAR_RANGE_M - WARNING_RANGE_M) / (FAR_RANGE_M - CLOSEST_RANGE_M)) * 900;
 
   // The backend emits post_evade_action: 'schedule_correction_burn' on every
   // burn. It was previously read by nothing; it drives the return leg here.
