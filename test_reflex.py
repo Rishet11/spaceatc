@@ -70,7 +70,7 @@ async def _orchestrator():
     reset_decision_cache()
     for det, dist in [(False, 9.9), (True, 3.0), (True, 1.8), (True, 0.9)]:
         st, tl = classify_threat(det, dist)
-        log, cmd = await reflex_decision(st, tl, det, dist, [0.0, 0.0, dist], [1, 0, 0, 0])
+        log, cmd, content_review = await reflex_decision(st, tl, det, dist, [0.0, 0.0, dist], [1, 0, 0, 0])
         assert f"{dist:.2f} m" in log               # live range header
         assert log.count("Found Play") == 1          # single retrieved-play line
         if st == "CRITICAL":

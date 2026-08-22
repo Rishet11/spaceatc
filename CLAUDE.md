@@ -17,6 +17,6 @@ Env vars: `GROQ_API_KEY`, `CELESTRAK_BASE_URL`, `SPACE_TRACK_USERNAME`, `SPACE_T
 `VITE_*` vars are inlined at build time. `VITE_HITL_TIMEOUT_S` is a Dockerfile ARG, not a
 runtime variable — setting it on the host after the image is built has no effect.
 
-Test: `pytest test_*.py` (runs offline, no pytest plugins needed; Python 3.11+)
+Test: `pytest test_*.py` (runs offline; Python 3.11+)
 
 If STATE.md exists in this root, read it first for current status.
