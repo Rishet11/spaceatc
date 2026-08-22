@@ -54,7 +54,7 @@ export const StageTracker: React.FC = () => {
       : null;
 
   return (
-    <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-30 w-[min(92%,720px)]">
+    <div className="pointer-events-none absolute top-16 left-1/2 -translate-x-1/2 z-30 w-[min(92%,720px)]">
       <div className="bg-black/55 backdrop-blur-sm border border-white/10 rounded-lg px-5 py-2.5 font-mono shadow-lg">
         {/* Stepper */}
         <div className="flex items-center justify-between">
