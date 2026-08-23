@@ -86,11 +86,11 @@ function Dashboard() {
         </div>
       )}
       <MetricsBar />
+      {activeTab === 'ground' && <StageTracker />}
       {activeTab === 'ground' ? (
         <div className="flex-1 flex flex-row overflow-hidden">
           <div className={`flex-1 relative ${isCollision ? 'animate-screen-shake' : ''}`}>
             <Globe />
-            <StageTracker />
             <Legend />
 
             <button
