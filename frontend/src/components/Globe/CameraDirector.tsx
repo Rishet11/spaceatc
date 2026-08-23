@@ -14,15 +14,16 @@ const IDLE_DIST = 4.0;
 // rings clipped"; sitting close to IDLE_DIST is what actually leaves room to
 // see both full rings crossing plus the post-maneuver divergence.
 const DETECTED_DIST = 4.2;
-// Share of viewport height the docked HITL panel occupies. Used to lift the
-// framed point above it while that panel is open, so the panel never covers
-// the closest-approach marker.
+// Share of viewport height the docked HITL panel used to occupy. Kept only
+// to size the small pull-back below -- the panel is short enough now (see
+// AWAITING_DIST) that no vertical shift is needed to clear it, so this no
+// longer feeds any lookAt offset.
 const BOTTOM_PANEL_FRACTION = 0.30;
 
-// Pull-back distance while awaiting a decision. No longer derived from a
-// view-offset magnification factor (that mechanism is gone, see
-// frameLiftOffset) -- just a bit further out than DETECTED_DIST so the extra
-// vertical lift still leaves the full orbit rings on screen.
+// Pull-back distance while awaiting a decision: a bit further out than
+// DETECTED_DIST so the docked HITL panel has less chance of overlapping the
+// closest-approach marker. Distance-only -- never shift the lookAt point
+// vertically to dodge the panel, that made the globe slide off-centre.
 const AWAITING_DIST = 4.0 * (1 + BOTTOM_PANEL_FRACTION);
 
 // Furthest the camera may swing off the sun direction to bring the crossing
@@ -41,33 +42,6 @@ function easeOutCubic(t: number) {
 }
 function easeInCubic(t: number) {
   return t * t * t;
-}
-
-// Lifts a lookAt point above true screen-center by rotating the aim point
-// around the camera rather than shifting the projection frustum. A
-// setViewOffset-based lens shift only crops the rendered frame's height
-// (its fullWidth stays the real viewport width), which changes the
-// *effective* aspect ratio of what's on screen and stretches the globe.
-// Tilting the aim point is a pure rotation, so the aspect ratio is never
-// touched.
-function frameLiftOffset(
-  camPos: THREE.Vector3,
-  lookAt: THREE.Vector3,
-  fovDeg: number,
-  fraction: number
-): THREE.Vector3 {
-  if (fraction <= 0) return new THREE.Vector3();
-  const forward = lookAt.clone().sub(camPos);
-  const dist = forward.length();
-  if (dist < 1e-6) return new THREE.Vector3();
-  forward.normalize();
-  const worldUp = new THREE.Vector3(0, 1, 0);
-  let right = new THREE.Vector3().crossVectors(forward, worldUp);
-  if (right.lengthSq() < 1e-8) right = new THREE.Vector3(1, 0, 0);
-  right.normalize();
-  const trueUp = new THREE.Vector3().crossVectors(right, forward).normalize();
-  const halfHeight = dist * Math.tan(THREE.MathUtils.degToRad(fovDeg / 2));
-  return trueUp.multiplyScalar(2 * halfHeight * fraction);
 }
 
 interface CameraDirectorProps {
@@ -97,8 +71,6 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
   const startLookAt = useRef(new THREE.Vector3(0, 0, 0));
   const currentLookAt = useRef(new THREE.Vector3(0, 0, 0));
   const driftAngle = useRef(0);
-  // Eased 0..1 blend for the 'awaiting' vertical lift (see frameLiftOffset).
-  const liftBlend = useRef(0);
 
   // Once the user drags or scrolls, the director stops overriding the camera
   // for the rest of the current stage -- reset on the next stage transition.
@@ -267,15 +239,6 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
       tcaPoint = lastTca.current ?? currentLookAt.current.clone();
     }
 
-    // --- Vertical framing: keep the crossing clear of the bottom panel ---
-    // Only the HITL panel is bottom-docked, so only 'awaiting' needs the lift.
-    liftBlend.current = THREE.MathUtils.damp(
-      liftBlend.current,
-      pipelineStage === 'awaiting' ? 1 : 0,
-      4,
-      delta,
-    );
-
     const stageElapsed = Date.now() - stageStartRef.current;
 
     switch (pipelineStage) {
@@ -305,13 +268,7 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
         const e = easeOutCubic(t);
         const dist = THREE.MathUtils.lerp(DETECTED_DIST, AWAITING_DIST, e);
         camera.position.copy(bisector.clone().multiplyScalar(dist));
-        const lift = frameLiftOffset(
-          camera.position,
-          tcaPoint,
-          (camera as THREE.PerspectiveCamera).fov,
-          BOTTOM_PANEL_FRACTION * liftBlend.current,
-        );
-        currentLookAt.current.copy(tcaPoint).sub(lift);
+        currentLookAt.current.copy(tcaPoint);
         camera.lookAt(currentLookAt.current);
         break;
       }
