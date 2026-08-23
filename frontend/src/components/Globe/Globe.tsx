@@ -187,28 +187,48 @@ function ConjunctionZone() {
         </Html>
       )}
 
-      {/* A "CONJUNCTION RESOLVED" watermark used to render here, anchored at
-          this same midpoint, once decisionOutcome had cleared -- by which
-          time OutcomeOverlay's centre banner (COLLISION AVOIDED / MANEUVER
-          EXECUTED) and the MathPanel
-          resolved card already say the same thing -- and it collided with
-          ConjunctionPaths.tsx's exaggeration-factor caption, which anchors at
-          the same point and carries required disclosure text that must stay
-          readable. Removed rather than repositioned: it was redundant with
-          the other two, and the caption is the one that has to win the
-          fight for this spot. */}
+      {isResolving && (
+        <Html position={midpoint} center zIndexRange={[10, 0]}>
+          <div style={{
+             fontSize: '2rem',
+             color: '#22c55e',
+             fontWeight: 'bold',
+             fontFamily: 'var(--font-mono)',
+             whiteSpace: 'nowrap',
+             textShadow: '0 0 20px #22c55e',
+             animation: 'fadeOut 3s forwards',
+             pointerEvents: 'none'
+          }}>
+            CONJUNCTION RESOLVED
+          </div>
+          <style>{`
+            @keyframes fadeOut {
+              0% { opacity: 0; transform: scale(0.8); }
+              10% { opacity: 1; transform: scale(1.1); }
+              20% { opacity: 1; transform: scale(1); }
+              80% { opacity: 1; }
+              100% { opacity: 0; }
+            }
+          `}</style>
+        </Html>
+      )}
     </>
   );
 }
 
 // Globe — main component
 export const Globe: React.FC = () => {
-  const pipelineStage = useSpaceStore((s) => s.pipelineStage);
+  const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
+  const decisionOutcome = useSpaceStore((s) => s.decisionOutcome);
 
-  // Rotation is only held still while the camera is actively framing a
-  // conjunction for a decision ('awaiting'); a resolved/collided event
-  // hanging around in the store must not freeze the globe forever.
-  const eventActive = pipelineStage === 'awaiting';
+  const eventActive =
+    !!decisionOutcome ||
+    activeConjunctions.some(
+      (c) =>
+        c.status === 'detected' ||
+        c.status === 'negotiating' ||
+        c.status === 'pending_hitl'
+    );
 
   const controlsRef = useRef<any>(null);
 

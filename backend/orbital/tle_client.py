@@ -63,10 +63,8 @@ async def fetch_tle_group(url: str) -> tuple[str, str]:
             response = await client.get(url)
             response.raise_for_status()
             text = response.text
-            # Debug-level: this is a raw pre-truncation parse count, not the
-            # number of satellites actually ingested/tracked/displayed.
-            logger.debug(
-                "Fetched %.1f kB, approx %d satellites (pre-filter parse count)",
+            logger.info(
+                "Fetched %.1f kB, approx %d satellites",
                 len(text) / 1024,
                 text.strip().count("\n") // 3,
             )
@@ -80,10 +78,8 @@ async def fetch_tle_group(url: str) -> tuple[str, str]:
         cache_path = Path(__file__).parent / "starlink_cache.tle"
         if cache_path.exists():
             text = cache_path.read_text(encoding="utf-8")
-            # Debug-level: this is a raw pre-truncation parse count, not the
-            # number of satellites actually ingested/tracked/displayed.
-            logger.debug(
-                "Loaded TLE data from bundled local cache (%s), approx %d satellites (pre-filter parse count)",
+            logger.info(
+                "Loaded TLE data from bundled local cache (%s), approx %d satellites",
                 cache_path.name,
                 text.strip().count("\n") // 3,
             )

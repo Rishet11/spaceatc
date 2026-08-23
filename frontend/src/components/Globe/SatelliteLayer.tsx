@@ -3,25 +3,8 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import { useSpaceStore } from '../../store/useSpaceStore';
-import { advancePosition } from './orbits';
 
 const MAX_INSTANCES = 500;
-
-// A backend 'satellite_update' tick only lands every so often, so rendering
-// the raw store position each frame snapped the dot from tick to tick --
-// motionless between ticks at 1x, and an increasingly visible jump at higher
-// sim speeds (each tick's position advances further). Track the last two
-// ticks per satellite (in real wall-clock time) and rotate the displayed
-// position continuously along the great-circle between them instead.
-interface OrbitSample {
-  prevPos: THREE.Vector3;
-  curPos: THREE.Vector3;
-  prevTime: number;
-  curTime: number;
-}
-// Cap extrapolation past the last tick at this many tick-intervals, so a
-// stalled/disconnected feed freezes the dot instead of spinning it off orbit.
-const MAX_EXTRAPOLATE_TICKS = 2.5;
 
 /**
  * Convert geodetic coordinates (lat, lon, alt_km) to Three.js sphere position.
@@ -128,39 +111,6 @@ export const SatelliteLayer: React.FC = () => {
     setTrailUpdate(t => t + 1);
   }, [satellites, destroyedSatellites, highlightedSats, resolvedEvent]);
 
-  const orbitSamplesRef = useRef<Map<string, OrbitSample>>(new Map());
-
-  // Record a new backend sample per satellite whenever the store updates
-  // (i.e. once per broadcast tick), independent of render frame rate.
-  React.useEffect(() => {
-    const now = Date.now();
-    Object.values(satellites).forEach((sat) => {
-      if (sat.lat === undefined || sat.lon === undefined || sat.alt_km === undefined) return;
-      const pos = geodeticToThreeJS(sat.lat, sat.lon, sat.alt_km);
-      const existing = orbitSamplesRef.current.get(sat.name!);
-      if (!existing) {
-        orbitSamplesRef.current.set(sat.name!, { prevPos: pos, curPos: pos, prevTime: now, curTime: now });
-      } else if (existing.curPos.distanceTo(pos) > 1e-6) {
-        orbitSamplesRef.current.set(sat.name!, {
-          prevPos: existing.curPos,
-          curPos: pos,
-          prevTime: existing.curTime,
-          curTime: now,
-        });
-      }
-    });
-  }, [satellites]);
-
-  const displayPosition = (name: string, fallback: THREE.Vector3): THREE.Vector3 => {
-    const sample = orbitSamplesRef.current.get(name);
-    if (!sample) return fallback;
-    const tickSpan = sample.curTime - sample.prevTime;
-    if (tickSpan <= 0) return sample.curPos;
-    const ticksSinceUpdate = (Date.now() - sample.curTime) / tickSpan;
-    const progress = 1 + Math.min(ticksSinceUpdate, MAX_EXTRAPOLATE_TICKS);
-    return advancePosition(sample.prevPos, sample.curPos, progress);
-  };
-
   useFrame(() => {
     if (!meshRef.current) return;
 
@@ -178,8 +128,7 @@ export const SatelliteLayer: React.FC = () => {
     satsArray.forEach((sat, i) => {
       if (i >= MAX_INSTANCES) return;
 
-      const rawPos = geodeticToThreeJS(sat.lat!, sat.lon!, sat.alt_km!);
-      const pos = displayPosition(sat.name!, rawPos);
+      const pos = geodeticToThreeJS(sat.lat!, sat.lon!, sat.alt_km!);
       tempObject.position.copy(pos);
 
       const isHighlighted = highlightedSats.has(sat.name!);

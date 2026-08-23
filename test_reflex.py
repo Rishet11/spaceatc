@@ -98,7 +98,7 @@ async def _bad_llm_narrative_is_not_cached(monkeypatch):
         # No line starting with "Verdict:" — violates the prompt's contract.
     ]
 
-    async def fake_groq_chat(prompt, *, system=None, json_mode=False, max_tokens=256, reasoning_effort=None):
+    async def fake_groq_chat(prompt, *, system=None, json_mode=False, max_tokens=256):
         return json.dumps(
             {
                 "reasoning": bad_reasoning,
@@ -156,7 +156,7 @@ async def _good_llm_narrative_critical_is_accepted(monkeypatch):
         "Verdict: cross-track burn on +Y axis is required to clear the object.",
     ]
 
-    async def fake_groq_chat(prompt, *, system=None, json_mode=False, max_tokens=256, reasoning_effort=None):
+    async def fake_groq_chat(prompt, *, system=None, json_mode=False, max_tokens=256):
         return json.dumps(
             {
                 "reasoning": good_reasoning,

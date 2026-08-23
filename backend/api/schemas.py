@@ -171,63 +171,6 @@ class HITLDecision(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class EncounterFrameOffset(BaseModel):
-    """A craft's position in the local encounter frame, km, relative to the
-    encounter point (see EncounterFramePositions)."""
-
-    x_km: float = Field(description="Along the miss vector, primary -> secondary")
-    y_km: float = Field(description="Completes the right-handed local frame")
-    z_km: float = Field(description="Along the closing (relative-velocity) direction")
-
-
-class EncounterFramePositions(BaseModel):
-    """Both craft's positions at a series' minimum, in a local frame centred
-    on the encounter point rather than ECI, suitable for a true-scale
-    close-up view without any orbital mechanics on the frontend."""
-
-    primary_km: EncounterFrameOffset
-    secondary_km: EncounterFrameOffset
-
-
-class SeparationSeries(BaseModel):
-    """A separation-vs-time series for one leg (pre- or post-maneuver) of a
-    conjunction, dense near its own minimum for a smooth chart."""
-
-    t_offset_s: list[float] = Field(
-        description="Seconds relative to the conjunction's TCA, ascending"
-    )
-    separation_km: list[float] = Field(
-        description="Separation distance in km at each t_offset_s"
-    )
-    min_separation_km: float
-    min_separation_time: datetime
-    min_separation_offset_s: float = Field(
-        description="Seconds relative to TCA where this series' minimum occurs"
-    )
-    relative_velocity_km_s: float = Field(
-        description="Relative velocity at this series' own minimum, km/s"
-    )
-    positions_at_min: EncounterFramePositions = Field(
-        description="Both craft's positions at this series' minimum, local encounter frame"
-    )
-
-
-class EncounterGeometryResponse(BaseModel):
-    """Response for GET /api/conjunctions/{event_id}/encounter: separation
-    over time and true-scale TCA geometry for both the original collision
-    course and the post-maneuver path."""
-
-    event_id: str
-    sat_primary: str
-    sat_secondary: str
-    tca: datetime = Field(description="TCA of the original (pre-maneuver) collision course")
-    pre_maneuver: SeparationSeries
-    post_maneuver: SeparationSeries | None = Field(
-        default=None,
-        description="None until a winning maneuver proposal exists for this event",
-    )
-
-
 class MetricsResponse(BaseModel):
     """Response for GET /api/metrics — always-visible top bar data (PRD §10.3)."""
 

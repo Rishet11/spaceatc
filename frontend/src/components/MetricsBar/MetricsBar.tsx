@@ -6,7 +6,7 @@ import { Tooltip } from '../Tooltip';
 const SPEED_OPTIONS = [1, 10, 60, 300, 600];
 
 function formatSimTime(isoStr: string): string {
-  if (!isoStr) return '-';
+  if (!isoStr) return '—';
   try {
     const d = new Date(isoStr);
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -15,7 +15,7 @@ function formatSimTime(isoStr: string): string {
       `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`
     );
   } catch {
-    return '-';
+    return '—';
   }
 }
 
@@ -104,7 +104,7 @@ export const MetricsBar: React.FC = () => {
           <div className="text-gray-600">|</div>
           <div className="flex items-center space-x-2 text-red-400">
             <ShieldAlert className="w-4 h-4" />
-            <Tooltip text="Predicted close approaches where collision probability exceeds 1 in 10,000, the industry standard alert threshold." position="bottom">
+            <Tooltip text="Predicted close approaches where collision probability exceeds 1 in 10,000 — the industry standard alert threshold." position="bottom">
               <span>Conjunctions:</span>
             </Tooltip>
             <strong className="text-white">{metrics.conjunctions_detected}</strong>
@@ -124,7 +124,7 @@ export const MetricsBar: React.FC = () => {
           </div>
           <div className="text-gray-600">|</div>
           <div className="flex items-center space-x-2 text-amber-400">
-            <Tooltip text="Total fuel burned across all maneuvers. 0.1 m/s ≈ the speed of a slow walk, a tiny nudge that prevents catastrophic collision." position="bottom">
+            <Tooltip text="Total fuel burned across all maneuvers. 0.1 m/s ≈ the speed of a slow walk — a tiny nudge that prevents catastrophic collision." position="bottom">
               <span>Total ΔV:</span>
             </Tooltip>
             {/* total_delta_v_ms is already in m/s end to end (conjunction.py
@@ -177,13 +177,13 @@ export const MetricsBar: React.FC = () => {
                   disabled={isPending}
                   title={
                     speed === 1
-                      ? '1×: Real time. Satellites barely move.'
+                      ? '1× — Real time. Satellites barely move.'
                       : speed === 60
-                        ? '60×: One orbit (~90 min) in 90 seconds.'
+                        ? '60× — One orbit (~90 min) in 90 seconds.'
                         : speed === 300
-                          ? '300×: Full orbit in 18 seconds.'
+                          ? '300× — Full orbit in 18 seconds.'
                           : speed === 600
-                            ? '600×: Full orbit in 9 seconds.'
+                            ? '600× — Full orbit in 9 seconds.'
                             : `${speed}× simulation speed`
                   }
                   className={`

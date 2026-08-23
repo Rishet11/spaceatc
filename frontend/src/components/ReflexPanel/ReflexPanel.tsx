@@ -106,17 +106,11 @@ export const ReflexPanel: React.FC = () => {
       setFrameFetchState('ready');
       setError(null);
 
-      // Append decision logs to local terminal state. The onboard reasoning
-      // is cached per threat band (see backend reflex_playbook.reflex_decision)
-      // and served unchanged on every frame in that band, so consecutive
-      // frames often produce byte-identical lines; collapse those instead of
-      // stacking up repeats.
+      // Append decision logs to local terminal state
       if (data.decision_log) {
         const lines = data.decision_log.split('\n');
         setLogMessages((prev) => {
-          const updated = [...prev, ...lines].filter(
-            (line, i, arr) => i === 0 || line !== arr[i - 1]
-          );
+          const updated = [...prev, ...lines];
           return updated.slice(-150); // Keep last 150 lines
         });
       }
@@ -130,11 +124,7 @@ export const ReflexPanel: React.FC = () => {
 
     } catch (err: any) {
       if (seq !== fetchSeqRef.current) return;
-      // Keep the last successfully rendered frame in place on a transient
-      // fetch failure. Nulling it here reset pose.distance to null, which
-      // snapped the evasion schematic's satellite marker back to its start
-      // position (approach = 0) until the next frame loaded, making replay
-      // look like it moves forward and then jumps backward.
+      setFrameData(null);
       setFrameFetchState('unavailable');
       setError(err.message || "Failed to load frame data");
     } finally {
@@ -746,15 +736,15 @@ export const ReflexPanel: React.FC = () => {
               <div className="space-y-2 font-mono text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">X:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[0].toFixed(3) : "-"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[0].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Y:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[1].toFixed(3) : "-"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[1].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Z:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[2].toFixed(3) : "-"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.translation[2].toFixed(3) : "—"}</span>
                 </div>
               </div>
             </div>
@@ -765,19 +755,19 @@ export const ReflexPanel: React.FC = () => {
               <div className="space-y-1 font-mono text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qw:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[0].toFixed(3) : "-"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[0].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qx:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[1].toFixed(3) : "-"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[1].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qy:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[2].toFixed(3) : "-"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[2].toFixed(3) : "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-400">Qz:</span>
-                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[3].toFixed(3) : "-"}</span>
+                   <span className="font-bold text-white">{frameData ? frameData.pose.quaternion[3].toFixed(3) : "—"}</span>
                 </div>
               </div>
             </div>
@@ -791,7 +781,7 @@ export const ReflexPanel: React.FC = () => {
                      distance === null ? "text-gray-500" : isEvading ? "text-red-500" : isWarning ? "text-amber-500" : "text-emerald-500"
                    }`}
                  >
-                   {distance === null ? "-" : `${distance.toFixed(2)} m`}
+                   {distance === null ? "—" : `${distance.toFixed(2)} m`}
                 </span>
               </div>
               {/* Range status bar */}
@@ -853,7 +843,7 @@ export const ReflexPanel: React.FC = () => {
               if (contentReview.used_fallback && reasons.length === 0) {
                 return (
                   <Tooltip
-                    text="No narrative was generated (model unavailable). Deterministic text is in use. This is not a review rejection."
+                    text="No narrative was generated (model unavailable). Deterministic text is in use — this is not a review rejection."
                     position="bottom"
                   >
                     <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider border text-gray-400 bg-gray-950/30 border-gray-500/20 cursor-help">

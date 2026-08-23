@@ -238,7 +238,7 @@ def _require_inference_assets():
             detail=(
                 "OrbitMind inference assets are unavailable on this deployment: "
                 + ", ".join(missing)
-                + ". These are Git LFS files. Deploy them as real binaries, not LFS pointers."
+                + ". These are Git LFS files — deploy them as real binaries, not LFS pointers."
             ),
         )
 
@@ -524,8 +524,8 @@ async def _compute_frame(
     )
     if partial["swept_range"]:
         decision_log = (
-            "[REPLAY] Relative range is a swept demonstration input. "
-            "Detection & decision logic are live.\n" + decision_log
+            "[REPLAY] Relative range is a swept demonstration input — "
+            "detection & decision logic are live.\n" + decision_log
         )
 
     response = {

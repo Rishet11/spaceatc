@@ -26,10 +26,10 @@ const BADGE_DOT: Record<string, string> = {
 
 const BADGE_TOOLTIPS: Record<string, string> = {
   'DETECTOR': "Orbital conjunction detection agent using SGP4 propagation and TCA optimization",
-  'COORDINATOR': "Contract-Net Protocol negotiation coordinator: manages bid collection and winner selection",
-  'OPERATOR': "Operator agent: computes minimum delta-V bid using Clohessy-Wiltshire equations",
-  'EXECUTOR': "Maneuver execution agent: applies approved burn and updates orbital state",
-  'HITL': "Human-In-The-Loop gate: final approval required before any satellite maneuver",
+  'COORDINATOR': "Contract-Net Protocol negotiation coordinator — manages bid collection and winner selection",
+  'OPERATOR': "Operator agent — computes minimum delta-V bid using Clohessy-Wiltshire equations",
+  'EXECUTOR': "Maneuver execution agent — applies approved burn and updates orbital state",
+  'HITL': "Human-In-The-Loop gate — final approval required before any satellite maneuver",
 };
 
 function parseBadge(message: string): string {
@@ -47,13 +47,11 @@ function parseBadge(message: string): string {
   return 'SYSTEM';
 }
 
-// UTC, not local wall-clock: the header shows "SIM TIME ... UTC" so the log
-// must use the same clock or it reads as a second, disagreeing one.
 function formatTime(isoStr: string): string {
   try {
     const d = new Date(isoStr);
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   } catch {
     return '--:--:--';
   }

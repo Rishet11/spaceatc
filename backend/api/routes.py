@@ -23,18 +23,7 @@ from backend.db.store import (
     update_conjunction_status
 )
 from backend.agents.graph import run_pipeline, resume_after_hitl
-from backend.api.schemas import (
-    EncounterFramePositions,
-    EncounterGeometryResponse,
-    MetricsResponse,
-    SeparationSeries,
-)
-from backend.orbital.encounter import (
-    build_post_maneuver_series,
-    build_pre_maneuver_series,
-    local_frame_positions,
-    min_point,
-)
+from backend.api.schemas import MetricsResponse
 from backend.orbital.propagator import propagate_at, propagate_two_body, eci_to_geodetic
 from sgp4.api import Satrec
 
@@ -215,102 +204,6 @@ async def get_conjunction_paths(event_id: str):
     return payload
 
 
-def _series_response(points, tca: datetime) -> SeparationSeries:
-    """Turn a list of encounter.SeparationPoint into a SeparationSeries."""
-    best = min_point(points)
-    primary_local, secondary_local = local_frame_positions(best)
-    return SeparationSeries(
-        t_offset_s=[float(p.offset_s) for p in points],
-        separation_km=[p.separation_km for p in points],
-        min_separation_km=best.separation_km,
-        min_separation_time=tca + timedelta(seconds=best.offset_s),
-        min_separation_offset_s=float(best.offset_s),
-        relative_velocity_km_s=float(
-            np.linalg.norm(best.v_secondary - best.v_primary)
-        ),
-        positions_at_min=EncounterFramePositions(
-            primary_km=primary_local, secondary_km=secondary_local
-        ),
-    )
-
-
-@router.get(
-    "/api/conjunctions/{event_id}/encounter",
-    response_model=EncounterGeometryResponse,
-)
-async def get_conjunction_encounter(event_id: str):
-    """Separation-vs-time series and true-scale TCA geometry for a conjunction.
-
-    Returns TWO series -- the pre-maneuver (collision course) separation and,
-    once a maneuver has been proposed, the post-maneuver separation -- built
-    from the same SGP4 + two-body-differential physics the globe's
-    post-burn trajectory uses (see backend/orbital/encounter.py). Positions
-    at each series' own minimum are also given in a local encounter frame
-    (km, relative to the encounter point) for a true-scale close-up view.
-    """
-    ev = await get_conjunction(event_id)
-    if not ev:
-        raise HTTPException(status_code=404, detail="Conjunction not found")
-
-    try:
-        tca = datetime.fromisoformat(ev["tca"])
-    except (KeyError, ValueError):
-        raise HTTPException(status_code=400, detail="Conjunction has no valid TCA")
-    if tca.tzinfo is None:
-        tca = tca.replace(tzinfo=timezone.utc)
-
-    def _find_satrec(name):
-        for data in sat_cache.values():
-            if data.get("name") == name:
-                return data.get("satrec")
-        return None
-
-    name_primary = ev["sat_primary"]
-    name_secondary = ev["sat_secondary"]
-    satrec_primary = _find_satrec(name_primary)
-    satrec_secondary = _find_satrec(name_secondary)
-    if satrec_primary is None or satrec_secondary is None:
-        raise HTTPException(status_code=404, detail="Satellite propagation data unavailable")
-
-    pre_points = build_pre_maneuver_series(satrec_primary, satrec_secondary, tca)
-    if not pre_points:
-        raise HTTPException(status_code=404, detail="Propagation produced no points")
-    pre_series = _series_response(pre_points, tca)
-
-    post_series = None
-    proposals = await get_proposals_for_event(event_id)
-    if proposals:
-        winner = proposals[0]  # ORDER BY bid_score ASC -- lowest cost wins
-        maneuvering_name = winner["satellite_name"]
-        maneuvering_is_primary = maneuvering_name == name_primary
-        if maneuvering_is_primary or maneuvering_name == name_secondary:
-            try:
-                burn_time = datetime.fromisoformat(winner["burn_time"])
-            except (KeyError, ValueError):
-                burn_time = None
-            if burn_time is not None:
-                post_points = build_post_maneuver_series(
-                    satrec_primary,
-                    satrec_secondary,
-                    maneuvering_is_primary,
-                    tca,
-                    burn_time,
-                    winner["delta_v_ms"],
-                    winner["burn_direction"],
-                )
-                if post_points:
-                    post_series = _series_response(post_points, tca)
-
-    return EncounterGeometryResponse(
-        event_id=event_id,
-        sat_primary=name_primary,
-        sat_secondary=name_secondary,
-        tca=tca,
-        pre_maneuver=pre_series,
-        post_maneuver=post_series,
-    )
-
-
 async def _post_maneuver_track(event_id, offsets, tca, find_satrec):
     """The maneuvering satellite's real trajectory after the winning burn.
 
@@ -410,15 +303,11 @@ async def _post_maneuver_track(event_id, offsets, tca, find_satrec):
 async def get_metrics():
     import aiosqlite
     from backend.config import settings
-
-    # Active satellites: count of what's actually cached and propagated (and
-    # therefore what a judge sees moving on the globe), not a raw row count
-    # from the satellites table. Ingestion nodes can upsert catalog rows that
-    # never make it into sat_cache, which would otherwise let this headline
-    # number diverge from the "Active Satellites" a viewer can see on screen.
-    active_sats = len(sat_cache)
-
     async with aiosqlite.connect(settings.sqlite_path) as db:
+        # Active satellites: count from DB
+        async with db.execute("SELECT COUNT(*) FROM satellites") as c:
+            active_sats = (await c.fetchone())[0]
+        
         # Total conjunctions detected ever
         async with db.execute("SELECT COUNT(*) FROM conjunctions") as c:
             total_conjunctions = (await c.fetchone())[0]
@@ -463,29 +352,6 @@ async def get_metrics():
             "system_status": "ACTIVE"
         }
 
-async def reset_session_tables(db) -> None:
-    """Clear per-session demo state: conjunctions, proposals, and LangGraph
-    checkpoints. Leaves the satellites table (the tracked constellation
-    catalog) untouched -- that's not session data, it's what's on the globe.
-
-    Shared by the manual /api/demo/reset endpoint and by the startup
-    lifespan, so a fresh backend process never inherits a previous run's
-    counters or an orphaned pending_hitl conjunction.
-    """
-    # `checkpoints` and `writes` are created lazily by LangGraph's sqlite
-    # checkpointer on its first run, so on a fresh database they do not exist
-    # yet and an unconditional DELETE aborts startup. Clear only what is there.
-    cursor = await db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
-        "('conjunctions', 'proposals', 'checkpoints', 'writes')"
-    )
-    present = {row[0] for row in await cursor.fetchall()}
-    for table in ("conjunctions", "proposals", "checkpoints", "writes"):
-        if table in present:
-            await db.execute(f"DELETE FROM {table}")
-    await db.commit()
-
-
 @router.post("/api/demo/reset")
 async def demo_reset():
     import aiosqlite
@@ -501,7 +367,11 @@ async def demo_reset():
                 status_code=409,
                 detail="Cannot reset while a conjunction is awaiting human approval",
             )
-        await reset_session_tables(db)
+        await db.execute("DELETE FROM conjunctions")
+        await db.execute("DELETE FROM proposals")
+        await db.execute("DELETE FROM checkpoints")
+        await db.execute("DELETE FROM writes")
+        await db.commit()
     return {"status": "reset"}
 
 def generate_conjunction_tle_pair(epoch_dt: datetime) -> tuple[tuple[str, str, str], tuple[str, str, str]]:

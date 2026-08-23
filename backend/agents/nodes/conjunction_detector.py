@@ -113,7 +113,7 @@ async def detect_conjunctions(state: AgentState) -> dict:
                         "messages": [
                             f"[DETECTOR] Conjunction: {sat1['name']} / {sat2['name']}",
                             f"[DETECTOR] Miss distance: {c_out.miss_distance_km:.3f} km | Pc: 1 in {int(1/c_out.pc)} | TCA: {c_out.tca.strftime('%H:%M:%S')} UTC",
-                            "[DETECTOR] Status: ALERT, Pc exceeds 1\u00d710\u207b\u2074 threshold",
+                            "[DETECTOR] Status: ALERT \u2014 Pc exceeds 1\u00d710\u207b\u2074 threshold",
                         ]
                     }
                 ).model_dump())
