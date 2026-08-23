@@ -23,7 +23,18 @@ from backend.db.store import (
     update_conjunction_status
 )
 from backend.agents.graph import run_pipeline, resume_after_hitl
-from backend.api.schemas import MetricsResponse
+from backend.api.schemas import (
+    EncounterFramePositions,
+    EncounterGeometryResponse,
+    MetricsResponse,
+    SeparationSeries,
+)
+from backend.orbital.encounter import (
+    build_post_maneuver_series,
+    build_pre_maneuver_series,
+    local_frame_positions,
+    min_point,
+)
 from backend.orbital.propagator import propagate_at, propagate_two_body, eci_to_geodetic
 from sgp4.api import Satrec
 
@@ -202,6 +213,102 @@ async def get_conjunction_paths(event_id: str):
     if post is not None:
         payload["post_maneuver"] = post
     return payload
+
+
+def _series_response(points, tca: datetime) -> SeparationSeries:
+    """Turn a list of encounter.SeparationPoint into a SeparationSeries."""
+    best = min_point(points)
+    primary_local, secondary_local = local_frame_positions(best)
+    return SeparationSeries(
+        t_offset_s=[float(p.offset_s) for p in points],
+        separation_km=[p.separation_km for p in points],
+        min_separation_km=best.separation_km,
+        min_separation_time=tca + timedelta(seconds=best.offset_s),
+        min_separation_offset_s=float(best.offset_s),
+        relative_velocity_km_s=float(
+            np.linalg.norm(best.v_secondary - best.v_primary)
+        ),
+        positions_at_min=EncounterFramePositions(
+            primary_km=primary_local, secondary_km=secondary_local
+        ),
+    )
+
+
+@router.get(
+    "/api/conjunctions/{event_id}/encounter",
+    response_model=EncounterGeometryResponse,
+)
+async def get_conjunction_encounter(event_id: str):
+    """Separation-vs-time series and true-scale TCA geometry for a conjunction.
+
+    Returns TWO series -- the pre-maneuver (collision course) separation and,
+    once a maneuver has been proposed, the post-maneuver separation -- built
+    from the same SGP4 + two-body-differential physics the globe's
+    post-burn trajectory uses (see backend/orbital/encounter.py). Positions
+    at each series' own minimum are also given in a local encounter frame
+    (km, relative to the encounter point) for a true-scale close-up view.
+    """
+    ev = await get_conjunction(event_id)
+    if not ev:
+        raise HTTPException(status_code=404, detail="Conjunction not found")
+
+    try:
+        tca = datetime.fromisoformat(ev["tca"])
+    except (KeyError, ValueError):
+        raise HTTPException(status_code=400, detail="Conjunction has no valid TCA")
+    if tca.tzinfo is None:
+        tca = tca.replace(tzinfo=timezone.utc)
+
+    def _find_satrec(name):
+        for data in sat_cache.values():
+            if data.get("name") == name:
+                return data.get("satrec")
+        return None
+
+    name_primary = ev["sat_primary"]
+    name_secondary = ev["sat_secondary"]
+    satrec_primary = _find_satrec(name_primary)
+    satrec_secondary = _find_satrec(name_secondary)
+    if satrec_primary is None or satrec_secondary is None:
+        raise HTTPException(status_code=404, detail="Satellite propagation data unavailable")
+
+    pre_points = build_pre_maneuver_series(satrec_primary, satrec_secondary, tca)
+    if not pre_points:
+        raise HTTPException(status_code=404, detail="Propagation produced no points")
+    pre_series = _series_response(pre_points, tca)
+
+    post_series = None
+    proposals = await get_proposals_for_event(event_id)
+    if proposals:
+        winner = proposals[0]  # ORDER BY bid_score ASC -- lowest cost wins
+        maneuvering_name = winner["satellite_name"]
+        maneuvering_is_primary = maneuvering_name == name_primary
+        if maneuvering_is_primary or maneuvering_name == name_secondary:
+            try:
+                burn_time = datetime.fromisoformat(winner["burn_time"])
+            except (KeyError, ValueError):
+                burn_time = None
+            if burn_time is not None:
+                post_points = build_post_maneuver_series(
+                    satrec_primary,
+                    satrec_secondary,
+                    maneuvering_is_primary,
+                    tca,
+                    burn_time,
+                    winner["delta_v_ms"],
+                    winner["burn_direction"],
+                )
+                if post_points:
+                    post_series = _series_response(post_points, tca)
+
+    return EncounterGeometryResponse(
+        event_id=event_id,
+        sat_primary=name_primary,
+        sat_secondary=name_secondary,
+        tca=tca,
+        pre_maneuver=pre_series,
+        post_maneuver=post_series,
+    )
 
 
 async def _post_maneuver_track(event_id, offsets, tca, find_satrec):
