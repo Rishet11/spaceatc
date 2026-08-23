@@ -365,10 +365,17 @@ async def reset_session_tables(db) -> None:
     lifespan, so a fresh backend process never inherits a previous run's
     counters or an orphaned pending_hitl conjunction.
     """
-    await db.execute("DELETE FROM conjunctions")
-    await db.execute("DELETE FROM proposals")
-    await db.execute("DELETE FROM checkpoints")
-    await db.execute("DELETE FROM writes")
+    # `checkpoints` and `writes` are created lazily by LangGraph's sqlite
+    # checkpointer on its first run, so on a fresh database they do not exist
+    # yet and an unconditional DELETE aborts startup. Clear only what is there.
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
+        "('conjunctions', 'proposals', 'checkpoints', 'writes')"
+    )
+    present = {row[0] for row in await cursor.fetchall()}
+    for table in ("conjunctions", "proposals", "checkpoints", "writes"):
+        if table in present:
+            await db.execute(f"DELETE FROM {table}")
     await db.commit()
 
 
