@@ -248,3 +248,55 @@ def test_negotiation_loser_directly_credited_still_fails():
     result = review_negotiation_rationale(text, "Demo_A", "Demo_B", 0.242)
     assert result.passed is False
     assert any("Demo_B" in r for r in result.reasons)
+
+
+# --- Regression guard: winner-name Unicode-space false positive (Round 3) --
+#
+# Live Groq output for this prompt intermittently renders the operator ID's
+# separator as a narrow no-break space (U+202F) instead of an ASCII space or
+# underscore, e.g. "Demo A was chosen...". A `[_-]+`-only fold in
+# _normalize_name missed that, so a real, correct sentence was rejected and
+# replaced by the flat fallback template.
+
+
+def test_negotiation_winner_name_narrow_nbsp_passes():
+    text = (
+        "Demo A was chosen because, despite identical Δv (0.242 m/s), "
+        "it offered a larger fuel margin and more favorable timing than "
+        "Demo B."
+    )
+    result = review_negotiation_rationale(text, "Demo_A", "Demo_B", 0.242)
+    assert result.passed is True
+    assert result.reasons == []
+
+
+def test_negotiation_winner_name_thin_space_passes():
+    text = "Demo A was chosen because it provided a larger fuel margin at 0.242 m/s."
+    result = review_negotiation_rationale(text, "Demo_A", "Demo_B", 0.242)
+    assert result.passed is True
+    assert result.reasons == []
+
+
+def test_negotiation_winner_name_nbsp_passes():
+    text = "Demo A was chosen because it provided a larger fuel margin at 0.242 m/s."
+    result = review_negotiation_rationale(text, "Demo_A", "Demo_B", 0.242)
+    assert result.passed is True
+    assert result.reasons == []
+
+
+def test_negotiation_loser_credited_with_unicode_space_still_fails():
+    """The Unicode-space fold must not weaken the loser-credit guarantee."""
+    text = (
+        "Demo A proposed a burn, but Demo B was ultimately selected "
+        "for this maneuver, burning 0.242 m/s."
+    )
+    result = review_negotiation_rationale(text, "Demo_A", "Demo_B", 0.242)
+    assert result.passed is False
+    assert any("Demo_B" in r for r in result.reasons)
+
+
+def test_negotiation_delta_v_mismatch_with_unicode_space_still_fails():
+    """The Unicode-space fold must not weaken the delta-v cross-check."""
+    text = "Demo A was chosen for this maneuver, burning 9.999 m/s."
+    result = review_negotiation_rationale(text, "Demo_A", "Demo_B", 0.242)
+    assert result.passed is False

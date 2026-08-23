@@ -180,13 +180,17 @@ _DV_RELATIVE_TOLERANCE = 0.05
 
 
 def _normalize_name(s: str) -> str:
-    """Fold separator punctuation so 'Demo_A' and 'Demo A' compare equal.
+    """Fold separator punctuation and whitespace so 'Demo_A', 'Demo A', and
+    'Demo A' (narrow no-break space) all compare equal.
 
     LLM prose commonly de-codes operator IDs (e.g. drops the underscore) when
     writing natural-language sentences, so a plain substring check against
-    the raw ID is too strict.
+    the raw ID is too strict. It also sometimes renders the space with a
+    typographic Unicode space (narrow no-break, thin space, etc.) instead of
+    a plain ASCII one, which a `[_-]+`-only fold misses. The regex whitespace
+    class matches those Unicode space variants as well as the ASCII ones.
     """
-    return re.sub(r"[_-]+", " ", s.lower())
+    return re.sub(r"[_\-\s]+", " ", s.lower()).strip()
 
 
 # A handful of adverbs that legitimately sit between a helper verb ("was")
