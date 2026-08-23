@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSpaceStore } from '../../store/useSpaceStore';
 import { PipelineStage } from '../../types';
+import { Tooltip } from '../Tooltip';
 
 const STEPS = ['DETECT', 'NEGOTIATE', 'DECIDE', 'OUTCOME'];
 
@@ -135,7 +136,14 @@ export const StageTracker: React.FC = () => {
                   <span className="text-gray-400">{b.operator}</span>
                   <span className="text-blue-300">ΔV {b.delta_v_ms.toFixed(3)} m/s</span>
                   {b.bid_score === minScore && (
-                    <span className="text-green-400 text-[9px] tracking-widest">WINNER</span>
+                    <Tooltip
+                      text={`Lowest bid_score wins this Contract-Net auction. bid_score = ΔV (m/s) + maneuver_count × 0.1, a fuel-budget penalty for operators that have already maneuvered more. When both operators propose the same ΔV, as here, the one with fewer prior maneuvers has the lower score and wins — ΔV alone does not decide it.`}
+                      position="top"
+                    >
+                      <span className="text-green-400 text-[9px] tracking-widest border-b border-dashed border-green-700 cursor-help">
+                        WINNER
+                      </span>
+                    </Tooltip>
                   )}
                 </div>
               ))}

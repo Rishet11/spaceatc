@@ -46,7 +46,6 @@ function ConjunctionZone() {
   const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
   const satellites = useSpaceStore((s) => s.satellites);
   const resolvedEvent = useSpaceStore((s) => s.resolvedEvent);
-  const decisionOutcome = useSpaceStore((s) => s.decisionOutcome);
 
   // The REST poll's ConjunctionEvent.status doesn't always flip away from
   // 'detected' the instant a decision lands, which otherwise pinned this
@@ -188,35 +187,16 @@ function ConjunctionZone() {
         </Html>
       )}
 
-      {/* Suppressed while decisionOutcome is up: OutcomeOverlay's centre banner
-          already says COLLISION AVOIDED / MANEUVER EXECUTED with more detail,
-          stacked directly on top of this same midpoint. Showing both at once
-          is the "four layers stacked" bug; this one yields for its ~3.6s. */}
-      {isResolving && !decisionOutcome && (
-        <Html position={midpoint} center zIndexRange={[10, 0]}>
-          <div style={{
-             fontSize: '2rem',
-             color: '#22c55e',
-             fontWeight: 'bold',
-             fontFamily: 'var(--font-mono)',
-             whiteSpace: 'nowrap',
-             textShadow: '0 0 20px #22c55e',
-             animation: 'fadeOut 3s forwards',
-             pointerEvents: 'none'
-          }}>
-            CONJUNCTION RESOLVED
-          </div>
-          <style>{`
-            @keyframes fadeOut {
-              0% { opacity: 0; transform: scale(0.8); }
-              10% { opacity: 1; transform: scale(1.1); }
-              20% { opacity: 1; transform: scale(1); }
-              80% { opacity: 1; }
-              100% { opacity: 0; }
-            }
-          `}</style>
-        </Html>
-      )}
+      {/* A "CONJUNCTION RESOLVED" watermark used to render here, anchored at
+          this same midpoint, once decisionOutcome had cleared -- by which
+          time OutcomeOverlay's centre banner (COLLISION AVOIDED / MANEUVER
+          EXECUTED) and the MathPanel
+          resolved card already say the same thing -- and it collided with
+          ConjunctionPaths.tsx's exaggeration-factor caption, which anchors at
+          the same point and carries required disclosure text that must stay
+          readable. Removed rather than repositioned: it was redundant with
+          the other two, and the caption is the one that has to win the
+          fight for this spot. */}
     </>
   );
 }

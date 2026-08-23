@@ -5,6 +5,7 @@ import { useSpaceStore } from '../../store/useSpaceStore';
 import { geodeticToThreeJS } from './SatelliteLayer';
 import { deriveVelocity, getPredictedPath, closestApproachIndex } from './orbits';
 import { subsolarDirection } from './EarthMaterial';
+import { HITL_PANEL_HEIGHT_PX } from '../HITLPanel/HITLPanel';
 
 const IDLE_DIST = 4.0;
 // Distances tuned so the full orbit rings (radius up to ~1.15-1.2 for LEO
@@ -37,6 +38,23 @@ const MAX_SUN_SWING_RAD = (70 * Math.PI) / 180;
 const COLLISION_PUNCH_DIST = 1.6;
 const COLLISION_AFTERMATH_DIST = IDLE_DIST;
 
+// The Canvas camera's own fov prop (Globe.tsx) -- vertical field of view in
+// degrees, fixed regardless of the canvas's pixel height. Because it's a
+// vertical angle rather than a pixel measurement, every bound derived from
+// it below holds at any viewport height.
+const VERTICAL_FOV_DEG = 45;
+const HALF_FOV_RAD = (VERTICAL_FOV_DEG * Math.PI) / 180 / 2;
+// Stay this far inside the true frustum edge as float/render slop margin.
+const LIFT_SAFETY_MARGIN_RAD = (2 * Math.PI) / 180;
+// Design ceiling: however much room the live clamp below would allow, never
+// lift by more than this. "A bit," not the ~30%-of-viewport overshoot a
+// previous version pushed off the top of the screen.
+const MAX_LIFT_RAD = (6 * Math.PI) / 180;
+// Only need to clear roughly half the panel's angular footprint: the globe
+// is being recentred in the space still visible above the panel, not
+// relocated by the panel's full height.
+const LIFT_PANEL_COVERAGE = 0.5;
+
 function easeOutCubic(t: number) {
   return 1 - Math.pow(1 - t, 3);
 }
@@ -54,7 +72,7 @@ interface CameraDirectorProps {
 // of the two orbital-plane normals so both ellipses open up on screen
 // instead of one flattening into a line when viewed down its own normal.
 export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) => {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const pipelineStage = useSpaceStore((s) => s.pipelineStage);
   const satellites = useSpaceStore((s) => s.satellites);
   const activeConjunctions = useSpaceStore((s) => s.activeConjunctions);
@@ -268,7 +286,46 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
         const e = easeOutCubic(t);
         const dist = THREE.MathUtils.lerp(DETECTED_DIST, AWAITING_DIST, e);
         camera.position.copy(bisector.clone().multiplyScalar(dist));
-        currentLookAt.current.copy(tcaPoint);
+
+        // Small bounded lift while the HITL panel is docked at the bottom
+        // of the screen: nudge the aim point DOWN, which pushes the
+        // rendered globe UP, clear of the panel. Reuses `e` above so the
+        // lift eases in over the same window as the pull-back rather than
+        // snapping in; it eases back out for free when the next stage
+        // (resolved/collision) takes over and animates away from wherever
+        // the camera currently sits.
+        //
+        // The size is derived from the panel's real height so it lifts
+        // "just enough" (LIFT_PANEL_COVERAGE), then clamped twice: once by
+        // MAX_LIFT_RAD (a small design ceiling) and once by a live
+        // geometric bound computed from THIS frame's actual camera
+        // distance and aim-point offset, so the globe's top edge can never
+        // clip the frustum no matter where the conjunction currently sits
+        // or how tall the viewport is.
+        const panelFovFrac = Math.min(1, HITL_PANEL_HEIGHT_PX / size.height);
+        const desiredLiftRad = panelFovFrac * (HALF_FOV_RAD * 2) * LIFT_PANEL_COVERAGE;
+
+        const sphereHalfAngleRad = Math.asin(Math.min(1, 1 / dist));
+        const toOriginDir = camera.position.clone().negate().normalize();
+        const viewDir = tcaPoint.clone().sub(camera.position).normalize();
+        const offCenterRad = viewDir.angleTo(toOriginDir);
+        const availableLiftRad = Math.max(
+          0,
+          HALF_FOV_RAD - LIFT_SAFETY_MARGIN_RAD - sphereHalfAngleRad - offCenterRad
+        );
+
+        const liftRad = Math.min(desiredLiftRad, MAX_LIFT_RAD, availableLiftRad) * e;
+        // Convert the angular lift to a world-space offset using the
+        // camera's distance to the point actually being shifted (tcaPoint),
+        // not its distance to the origin -- tcaPoint sits up to ~0.45 units
+        // closer to the camera (it's lerped 55% toward the origin from a
+        // point near the sphere's surface), and using the longer distance
+        // there would understate the resulting angular shift, quietly
+        // eating into the safety margin computed above.
+        const camToTcaDist = camera.position.distanceTo(tcaPoint);
+        const liftWorld = camToTcaDist * Math.tan(liftRad);
+        const up = camera.up.clone().normalize();
+        currentLookAt.current.copy(tcaPoint).sub(up.multiplyScalar(liftWorld));
         camera.lookAt(currentLookAt.current);
         break;
       }

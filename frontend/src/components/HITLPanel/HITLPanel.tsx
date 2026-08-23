@@ -14,6 +14,16 @@ import { Tooltip } from '../Tooltip';
 // value shown on screen and the value we quote.
 const REVIEW_WINDOW_S = Number(import.meta.env.VITE_HITL_TIMEOUT_S ?? 60);
 
+// Fixed panel height in px. Substantial enough to read as the demo's one
+// human decision point (200-240px), not a sliver. CameraDirector.tsx reads
+// this same value (PANEL_HEIGHT_PX) to size how far it lifts the globe
+// while this panel is open -- keep the two in sync if this changes.
+export const HITL_PANEL_HEIGHT_PX = 224;
+// Matches App.tsx's mission-control log column width exactly, so the panel's
+// right edge always lands exactly where the log column begins, at any
+// viewport width.
+const LOG_COLUMN_WIDTH = 'clamp(18rem,22vw,28rem)';
+
 export const HITLPanel: React.FC = () => {
   const {
     currentHitlRequest,
@@ -189,26 +199,47 @@ export const HITLPanel: React.FC = () => {
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 h-auto bg-[#0f172a] border-t-4 border-red-500 z-50 text-white shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col font-mono transition-transform duration-300 ease-out ${mounted ? 'translate-y-0' : 'translate-y-full'}`}
+      style={{ height: `${HITL_PANEL_HEIGHT_PX}px`, right: LOG_COLUMN_WIDTH }}
+      className={`fixed bottom-0 left-0 bg-[#0f172a] border-t-4 border-red-500 z-50 text-white shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col font-mono transition-transform duration-300 ease-out ${mounted ? 'translate-y-0' : 'translate-y-full'}`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-black/20">
-        <div className="flex items-center space-x-2 text-red-500 font-bold text-sm tracking-wider">
-          <ShieldAlert className="w-4 h-4" />
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-black/20 shrink-0">
+        <div className="flex items-center space-x-2 text-red-500 font-bold text-base tracking-wider">
+          <ShieldAlert className="w-5 h-5" />
           <Tooltip text="Human-In-The-Loop: every maneuver requires explicit human approval before execution. No AI acts without oversight." position="top">
             <span>MANEUVER AUTHORIZATION REQUIRED</span>
           </Tooltip>
         </div>
-        <div className={`flex items-center space-x-1.5 text-sm font-bold ${timeLeft < REVIEW_WINDOW_S / 3 ? 'text-red-500 animate-pulse' : 'text-gray-300'}`}>
-          <Clock className="w-3.5 h-3.5" />
+        <div className={`flex items-center space-x-1.5 text-base font-bold ${timeLeft < REVIEW_WINDOW_S / 3 ? 'text-red-500 animate-pulse' : 'text-gray-300'}`}>
+          <Clock className="w-4 h-4" />
           <span>{timeLeft}s</span>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center flex-1 px-4 py-3 gap-3 lg:gap-4">
+      {/* AI Rationale: the single most judge-facing sentence in the app --
+          the LLM explaining a real decision -- so it gets a prominent spot
+          at the top with room to actually be read, not a truncated line at
+          the bottom. */}
+      {proposal.rationale && (
+        <div className="px-4 py-2 border-b border-white/10 bg-blue-500/10 shrink-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-blue-400 font-bold text-[11px] tracking-widest shrink-0">
+              AI RATIONALE
+            </span>
+            <p className="text-sm text-gray-100 leading-snug line-clamp-2" title={proposal.rationale}>
+              {proposal.rationale}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content. overflow-y-auto is a safety net, not the intended
+          look: below the lg breakpoint this stacks vertically and needs
+          more than the panel's fixed height, so it scrolls internally
+          instead of bleeding out over the globe above it. */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center flex-1 min-h-0 overflow-y-auto px-4 py-3 gap-3 lg:gap-4">
         {/* Left: Maneuver Details */}
-        <div className="grid grid-cols-4 gap-x-2 gap-y-1 text-xs lg:w-[34%] lg:border-r border-white/10 lg:pr-4">
+        <div className="grid grid-cols-4 gap-x-3 gap-y-1.5 text-sm lg:w-[34%] lg:border-r border-white/10 lg:pr-4">
           <span className="text-gray-400">SATELLITE</span>
           <span className="font-bold text-right truncate">{proposal.satellite_name}</span>
           <span className="text-gray-400">OPERATOR</span>
@@ -234,16 +265,6 @@ export const HITLPanel: React.FC = () => {
             {' → '}
             {proposal.post_maneuver_miss_km.toFixed(2)} km
           </span>
-
-          {proposal.rationale && (
-            <div
-              className="col-span-4 text-gray-400 text-xs mt-1 line-clamp-2"
-              title={proposal.rationale}
-            >
-              <span className="text-gray-500 mr-1">AI RATIONALE:</span>
-              {proposal.rationale}
-            </div>
-          )}
         </div>
 
         {/* Right: Risk Comparison */}
