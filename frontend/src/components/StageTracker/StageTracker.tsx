@@ -54,8 +54,8 @@ export const StageTracker: React.FC = () => {
       : null;
 
   return (
-    <div className="pointer-events-none absolute top-16 left-1/2 -translate-x-1/2 z-30 w-[min(92%,720px)]">
-      <div className="bg-black/55 backdrop-blur-sm border border-white/10 rounded-lg px-5 py-2.5 font-mono shadow-lg">
+    <div className="w-full bg-[#0a0f1e] border-b border-white/10 shrink-0 z-30 px-4 py-2">
+      <div className="mx-auto w-[min(92%,720px)] bg-black/40 border border-white/10 rounded-lg px-5 py-2 font-mono">
         {/* Stepper */}
         <div className="flex items-center justify-between">
           {STEPS.map((label, i) => {
@@ -102,7 +102,7 @@ export const StageTracker: React.FC = () => {
                     )}
                     <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dot}`} />
                   </span>
-                  <span className={`text-[11px] font-bold tracking-widest ${textColor}`}>
+                  <span className={`text-xs font-bold tracking-widest ${textColor}`}>
                     {lbl}
                   </span>
                 </div>
@@ -118,8 +118,12 @@ export const StageTracker: React.FC = () => {
           })}
         </div>
 
-        {/* Caption */}
-        <div className="mt-1.5 text-center text-[12px] text-gray-300">{CAPTIONS[stage]}</div>
+        {/* Caption. Truncated to one line so the bar's height is fixed
+            regardless of viewport width, which the outcome banner's
+            vertical offset below relies on. */}
+        <div className="mt-1.5 text-center text-xs text-gray-300 truncate" title={CAPTIONS[stage]}>
+          {CAPTIONS[stage]}
+        </div>
 
         {/* Competing operator bids during negotiation / decision */}
         {(stage === 'negotiating' || stage === 'awaiting') &&
