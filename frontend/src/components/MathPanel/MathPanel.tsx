@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useSpaceStore } from '../../store/useSpaceStore';
 import { ChevronRight, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Tooltip } from '../Tooltip';
+
+/** The actual method this codebase uses (backend/orbital/conjunction.py):
+ * a simplified 2D Gaussian model, since TLEs carry no covariance to feed a
+ * real Akella-Alfriend calculation. Stated plainly rather than implying a
+ * textbook method this code doesn't run. */
+const PC_METHOD_EXPLANATION =
+  'Simplified 2D Gaussian model. TLEs carry no covariance, so this assumes ' +
+  'a fixed 1-sigma position uncertainty of 1 km and a 10 m combined hard-body ' +
+  'radius: Pc = pi * r^2 / sigma^2 * exp(-0.5 * (miss distance / sigma)^2).';
 
 /** Format a probability as "1 in N", which reads faster than an exponent. */
 const asOdds = (pc: number) => {
@@ -68,7 +78,7 @@ export const MathPanel: React.FC = () => {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-xl text-red-400 line-through decoration-red-500/50">
-              {missBefore !== null ? `${missBefore.toFixed(3)} km` : '—'}
+              {missBefore !== null ? `${missBefore.toFixed(3)} km` : '-'}
             </span>
             <ChevronRight className="w-4 h-4 text-gray-500 shrink-0" />
             <span className="text-2xl font-bold text-green-400">
@@ -85,12 +95,14 @@ export const MathPanel: React.FC = () => {
 
         {/* Collision probability */}
         <div className="px-4 py-2 border-t border-white/10">
-          <div className="text-[10px] tracking-widest text-gray-400 mb-1">
-            COLLISION PROBABILITY
-          </div>
+          <Tooltip text={PC_METHOD_EXPLANATION} position="bottom">
+            <div className="text-[10px] tracking-widest text-gray-400 mb-1 cursor-help underline decoration-dotted decoration-gray-600 underline-offset-2 w-fit">
+              COLLISION PROBABILITY
+            </div>
+          </Tooltip>
           <div className="flex items-baseline gap-2 text-[13px]">
             <span className="text-red-400">
-              {pcBefore !== null ? asOdds(pcBefore) : '—'}
+              {pcBefore !== null ? asOdds(pcBefore) : '-'}
             </span>
             <ChevronRight className="w-3.5 h-3.5 text-gray-500 shrink-0" />
             <span className="text-green-400 font-bold">{asOdds(pcAfter)}</span>

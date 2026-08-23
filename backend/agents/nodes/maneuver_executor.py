@@ -70,7 +70,7 @@ async def execute_maneuver(state: AgentState) -> dict:
 
     exec_messages = [
         "[EXECUTOR] Maneuver approved and executed",
-        f"[EXECUTOR] {sat_name} \u2014 burn: {dv:.3f} m/s {direction}",
+        f"[EXECUTOR] {sat_name}, burn: {dv:.3f} m/s {direction}",
         f"[EXECUTOR] Pc: {pc_before:.2e} \u2192 {pc_after:.2e} \u2713 SAFE",
         "[EXECUTOR] Conjunction RESOLVED",
     ]

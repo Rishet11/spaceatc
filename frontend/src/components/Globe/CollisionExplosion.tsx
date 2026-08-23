@@ -131,40 +131,51 @@ const ExplosionParticle: React.FC<{ data: ExplosionData }> = ({ data }) => {
 
   useFrame(({ clock }) => {
     const elapsed = clock.elapsedTime - data.startTime;
-    const duration = 2.6;
+    // Long enough to outlast the collision camera's full punch-in (0.8s) +
+    // hold (1.2s) + pull-back (1.8s) = 3.8s sequence with margin, so the
+    // flash is still burning once the camera settles at the wide aftermath
+    // framing instead of having already faded to nothing.
+    const duration = 4.5;
     const k = Math.min(elapsed / duration, 1);
+    // Past the flash, leave a dim, static wreckage mark rather than letting
+    // the whole event vanish -- a vetoed collision has to still read as
+    // "something happened here" long after the flash itself is gone.
+    const settled = k >= 1;
+    // Freeze growth once settled -- elapsed keeps climbing forever, but a
+    // wreckage mark should hold a fixed size, not keep inflating.
+    const growthElapsed = Math.min(elapsed, duration);
 
-    // Core flash — fast bloom, then fade.
+    // Core flash — fast bloom, then fade to a small persistent ember.
     if (coreRef.current && coreMat.current) {
-      const scale = 1 + Math.pow(elapsed * 6, 0.5);
+      const scale = 1 + Math.pow(growthElapsed * 5, 0.55);
       coreRef.current.scale.setScalar(scale);
-      coreMat.current.opacity = Math.max(0, 1 - k * 1.4);
+      coreMat.current.opacity = settled ? 0.3 : Math.max(0, 1 - k * 1.1);
     }
 
-    // Expanding shockwave ring.
+    // Expanding shockwave ring — gone once it has fully expanded.
     if (ringRef.current && ringMat.current) {
-      ringRef.current.scale.setScalar(1 + elapsed * 16);
-      ringMat.current.opacity = Math.max(0, 0.85 - k * 0.85);
+      ringRef.current.scale.setScalar(1 + growthElapsed * 14);
+      ringMat.current.opacity = settled ? 0 : Math.max(0, 0.85 - k * 0.85);
     }
 
     // Flash light.
     if (lightRef.current) {
-      lightRef.current.intensity = Math.max(0, 9 * (1 - k));
+      lightRef.current.intensity = settled ? 0 : Math.max(0, 9 * (1 - k));
     }
 
-    // Debris fragments fly outward.
+    // Debris fragments fly outward, then settle in place as visible wreckage.
+    // Capped independently of `duration` so a long-lived flash doesn't also
+    // fling debris an unreasonable distance from the collision point.
     if (debrisRef.current) {
       const pos = debrisGeo.attributes.position as THREE.BufferAttribute;
+      const t = Math.min(elapsed, 1.2);
       for (let i = 0; i < debrisVel.length; i++) {
-        pos.setXYZ(
-          i,
-          debrisVel[i].x * elapsed * 9,
-          debrisVel[i].y * elapsed * 9,
-          debrisVel[i].z * elapsed * 9
-        );
+        pos.setXYZ(i, debrisVel[i].x * t * 8, debrisVel[i].y * t * 8, debrisVel[i].z * t * 8);
       }
       pos.needsUpdate = true;
-      (debrisRef.current.material as THREE.PointsMaterial).opacity = Math.max(0, 1 - k);
+      (debrisRef.current.material as THREE.PointsMaterial).opacity = settled
+        ? 0.35
+        : Math.max(0, 1 - k);
     }
   });
 

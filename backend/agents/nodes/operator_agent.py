@@ -142,7 +142,7 @@ async def generate_operator_bid(state: AgentState) -> dict:
     rationale = review.reviewed_text
     winning_proposal["rationale"] = rationale
 
-    winner_msg = f"[COORDINATOR] Winner: {winner} \u2014 lowest cost maneuver selected"
+    winner_msg = f"[COORDINATOR] Winner: {winner}, lowest cost maneuver selected"
     all_messages = bid_messages + [winner_msg]
 
     # Queue negotiation_update (stage: "winner_selected")
@@ -160,7 +160,7 @@ async def generate_operator_bid(state: AgentState) -> dict:
     # Queue hitl_request
     hitl_messages = [
         "[HITL] Proposal sent to human operator for approval",
-        "[HITL] Awaiting decision \u2014 30 second timeout",
+        "[HITL] Awaiting decision: 30 second timeout",
     ]
     if review.passed:
         hitl_messages.append("[CONTENT-REVIEW] pass")

@@ -5,6 +5,7 @@ import { useSpaceStore } from '../../store/useSpaceStore';
 import { geodeticToThreeJS } from './SatelliteLayer';
 import { deriveVelocity, getPredictedPath, closestApproachIndex } from './orbits';
 import { subsolarDirection } from './EarthMaterial';
+import { HITL_PANEL_HEIGHT_PX } from '../HITLPanel/HITLPanel';
 
 const IDLE_DIST = 4.0;
 // Distances tuned so the full orbit rings (radius up to ~1.15-1.2 for LEO
@@ -14,14 +15,16 @@ const IDLE_DIST = 4.0;
 // rings clipped"; sitting close to IDLE_DIST is what actually leaves room to
 // see both full rings crossing plus the post-maneuver divergence.
 const DETECTED_DIST = 4.2;
-// Share of viewport height the docked HITL panel occupies. Used to lift the
-// scene out from behind it while that panel is open.
+// Share of viewport height the docked HITL panel used to occupy. Kept only
+// to size the small pull-back below -- the panel is short enough now (see
+// AWAITING_DIST) that no vertical shift is needed to clear it, so this no
+// longer feeds any lookAt offset.
 const BOTTOM_PANEL_FRACTION = 0.30;
 
-// The view offset renders a (1 + BOTTOM_PANEL_FRACTION) taller virtual frame
-// and crops to the real viewport, which magnifies by that same factor. Derive
-// the pull-back from it so lifting the scene above the panel does not also
-// zoom in and crop the orbit rings -- and so the two cannot drift apart.
+// Pull-back distance while awaiting a decision: a bit further out than
+// DETECTED_DIST so the docked HITL panel has less chance of overlapping the
+// closest-approach marker. Distance-only -- never shift the lookAt point
+// vertically to dodge the panel, that made the globe slide off-centre.
 const AWAITING_DIST = 4.0 * (1 + BOTTOM_PANEL_FRACTION);
 
 // Furthest the camera may swing off the sun direction to bring the crossing
@@ -29,6 +32,28 @@ const AWAITING_DIST = 4.0 * (1 + BOTTOM_PANEL_FRACTION);
 // lit, and the day/night line is the most striking framing available.
 const MAX_SUN_SWING_RAD = (70 * Math.PI) / 180;
 
+// How close the camera punches in on a veto, and how far it pulls back out
+// afterwards so the debris cloud reads as an event within its surroundings
+// rather than filling the whole screen.
+const COLLISION_PUNCH_DIST = 1.6;
+const COLLISION_AFTERMATH_DIST = IDLE_DIST;
+
+// The Canvas camera's own fov prop (Globe.tsx) -- vertical field of view in
+// degrees, fixed regardless of the canvas's pixel height. Because it's a
+// vertical angle rather than a pixel measurement, every bound derived from
+// it below holds at any viewport height.
+const VERTICAL_FOV_DEG = 45;
+const HALF_FOV_RAD = (VERTICAL_FOV_DEG * Math.PI) / 180 / 2;
+// Stay this far inside the true frustum edge as float/render slop margin.
+const LIFT_SAFETY_MARGIN_RAD = (2 * Math.PI) / 180;
+// Design ceiling: however much room the live clamp below would allow, never
+// lift by more than this. "A bit," not the ~30%-of-viewport overshoot a
+// previous version pushed off the top of the screen.
+const MAX_LIFT_RAD = (6 * Math.PI) / 180;
+// Only need to clear roughly half the panel's angular footprint: the globe
+// is being recentred in the space still visible above the panel, not
+// relocated by the panel's full height.
+const LIFT_PANEL_COVERAGE = 0.5;
 
 function easeOutCubic(t: number) {
   return 1 - Math.pow(1 - t, 3);
@@ -64,12 +89,11 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
   const startLookAt = useRef(new THREE.Vector3(0, 0, 0));
   const currentLookAt = useRef(new THREE.Vector3(0, 0, 0));
   const driftAngle = useRef(0);
-  // Animated vertical framing offset, in pixels of the real viewport. The HITL
-  // panel is docked to the bottom of the screen and was covering the closest-
-  // approach marker, which sits low in frame. Rather than move the camera
-  // (which would also change how much of the orbit rings fit), shift the
-  // rendered frustum so the scene composes into the space the panel leaves.
-  const viewOffset = useRef(0);
+
+  // Once the user drags or scrolls, the director stops overriding the camera
+  // for the rest of the current stage -- reset on the next stage transition.
+  const userTookControlRef = useRef(false);
+  const controlsListenerAttachedRef = useRef(false);
 
   // Continuously-updated "last known good" framing, independent of stage —
   // used to freeze an exact, non-stale snapshot the instant we enter
@@ -94,6 +118,7 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
       stageStartRef.current = Date.now();
       startCamPos.current.copy(camera.position);
       startLookAt.current.copy(currentLookAt.current);
+      userTookControlRef.current = false;
       if (enteringResolved) {
         const pos = lastBisector.current
           ? lastBisector.current.clone().multiplyScalar(AWAITING_DIST)
@@ -113,6 +138,19 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
   useFrame((_, delta) => {
     const controls = controlsRef.current;
 
+    // OrbitControls only reports drags/scrolls while enabled, so it must stay
+    // enabled through every stage for the "user input always wins" handoff
+    // below to ever see a 'start' event in the first place.
+    if (controls) {
+      controls.enabled = true;
+      if (!controlsListenerAttachedRef.current) {
+        controls.addEventListener('start', () => {
+          userTookControlRef.current = true;
+        });
+        controlsListenerAttachedRef.current = true;
+      }
+    }
+
     // Track short position history per pair member for velocity derivation.
     if (pair) {
       [pair.satA, pair.satB].forEach((name) => {
@@ -131,13 +169,17 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
     }
 
     if (pipelineStage === 'idle') {
-      if (controls) controls.enabled = true;
       currentLookAt.current.set(0, 0, 0);
       return;
     }
 
-    // Everything below is a scripted shot: user orbit control is disabled.
-    if (controls) controls.enabled = false;
+    // Once the user grabs the camera mid-stage, yield for good: stop writing
+    // camera.position/lookAt entirely until the next stage transition resets
+    // userTookControlRef, so OrbitControls (already enabled above) drives
+    // uncontested. Manual zoom-out and orbiting always work as a result.
+    if (userTookControlRef.current) {
+      return;
+    }
 
     let bisector: THREE.Vector3 | null = null;
     let tcaPoint: THREE.Vector3 | null = null;
@@ -215,25 +257,6 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
       tcaPoint = lastTca.current ?? currentLookAt.current.clone();
     }
 
-    // --- Vertical framing: keep the crossing clear of the bottom panel ---
-    // Only the HITL panel is bottom-docked, so only 'awaiting' needs the shift.
-    const wantOffset = pipelineStage === 'awaiting' ? size.height * BOTTOM_PANEL_FRACTION : 0;
-    viewOffset.current = THREE.MathUtils.damp(viewOffset.current, wantOffset, 4, delta);
-    if (viewOffset.current > 0.5) {
-      // Render rows [offset .. offset+height] of a taller virtual frame, which
-      // lifts the scene centre above the middle of the real viewport.
-      camera.setViewOffset(
-        size.width,
-        size.height + viewOffset.current,
-        0,
-        viewOffset.current,
-        size.width,
-        size.height,
-      );
-    } else if (camera.view?.enabled) {
-      camera.clearViewOffset();
-    }
-
     const stageElapsed = Date.now() - stageStartRef.current;
 
     switch (pipelineStage) {
@@ -263,7 +286,46 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
         const e = easeOutCubic(t);
         const dist = THREE.MathUtils.lerp(DETECTED_DIST, AWAITING_DIST, e);
         camera.position.copy(bisector.clone().multiplyScalar(dist));
-        currentLookAt.current.copy(tcaPoint);
+
+        // Small bounded lift while the HITL panel is docked at the bottom
+        // of the screen: nudge the aim point DOWN, which pushes the
+        // rendered globe UP, clear of the panel. Reuses `e` above so the
+        // lift eases in over the same window as the pull-back rather than
+        // snapping in; it eases back out for free when the next stage
+        // (resolved/collision) takes over and animates away from wherever
+        // the camera currently sits.
+        //
+        // The size is derived from the panel's real height so it lifts
+        // "just enough" (LIFT_PANEL_COVERAGE), then clamped twice: once by
+        // MAX_LIFT_RAD (a small design ceiling) and once by a live
+        // geometric bound computed from THIS frame's actual camera
+        // distance and aim-point offset, so the globe's top edge can never
+        // clip the frustum no matter where the conjunction currently sits
+        // or how tall the viewport is.
+        const panelFovFrac = Math.min(1, HITL_PANEL_HEIGHT_PX / size.height);
+        const desiredLiftRad = panelFovFrac * (HALF_FOV_RAD * 2) * LIFT_PANEL_COVERAGE;
+
+        const sphereHalfAngleRad = Math.asin(Math.min(1, 1 / dist));
+        const toOriginDir = camera.position.clone().negate().normalize();
+        const viewDir = tcaPoint.clone().sub(camera.position).normalize();
+        const offCenterRad = viewDir.angleTo(toOriginDir);
+        const availableLiftRad = Math.max(
+          0,
+          HALF_FOV_RAD - LIFT_SAFETY_MARGIN_RAD - sphereHalfAngleRad - offCenterRad
+        );
+
+        const liftRad = Math.min(desiredLiftRad, MAX_LIFT_RAD, availableLiftRad) * e;
+        // Convert the angular lift to a world-space offset using the
+        // camera's distance to the point actually being shifted (tcaPoint),
+        // not its distance to the origin -- tcaPoint sits up to ~0.45 units
+        // closer to the camera (it's lerped 55% toward the origin from a
+        // point near the sphere's surface), and using the longer distance
+        // there would understate the resulting angular shift, quietly
+        // eating into the safety margin computed above.
+        const camToTcaDist = camera.position.distanceTo(tcaPoint);
+        const liftWorld = camToTcaDist * Math.tan(liftRad);
+        const up = camera.up.clone().normalize();
+        currentLookAt.current.copy(tcaPoint).sub(up.multiplyScalar(liftWorld));
         camera.lookAt(currentLookAt.current);
         break;
       }
@@ -290,19 +352,43 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
           if (t >= 1 && controls) {
             controls.target.copy(currentLookAt.current);
             controls.update();
-            controls.enabled = true;
           }
         }
         break;
       }
       case 'collision': {
-        const dur = 800;
-        const t = Math.min(1, stageElapsed / dur);
-        const e = easeInCubic(t);
-        const punchPos = tcaPoint.clone().normalize().multiplyScalar(1.6);
-        camera.position.lerpVectors(startCamPos.current, punchPos, e);
-        currentLookAt.current.copy(tcaPoint);
-        camera.lookAt(currentLookAt.current);
+        // Punch in on the debris for impact, hold so the explosion reads,
+        // then pull back out to a context shot. Past that the camera is left
+        // alone entirely so OrbitControls (enabled, target already synced)
+        // drives freely -- otherwise this case would keep re-copying
+        // punchPos forever and trap the camera inside the debris cloud with
+        // no way to zoom out.
+        const punchDur = 800;
+        const holdDur = 1200;
+        const pullbackDur = 1800;
+        const punchPos = tcaPoint.clone().normalize().multiplyScalar(COLLISION_PUNCH_DIST);
+
+        if (stageElapsed < punchDur) {
+          const e = easeInCubic(stageElapsed / punchDur);
+          camera.position.lerpVectors(startCamPos.current, punchPos, e);
+          currentLookAt.current.copy(tcaPoint);
+          camera.lookAt(currentLookAt.current);
+        } else if (stageElapsed < punchDur + holdDur) {
+          camera.position.copy(punchPos);
+          currentLookAt.current.copy(tcaPoint);
+          camera.lookAt(currentLookAt.current);
+        } else if (stageElapsed < punchDur + holdDur + pullbackDur) {
+          const t = Math.min(1, (stageElapsed - punchDur - holdDur) / pullbackDur);
+          const e = easeOutCubic(t);
+          const aftermathPos = tcaPoint.clone().normalize().multiplyScalar(COLLISION_AFTERMATH_DIST);
+          camera.position.lerpVectors(punchPos, aftermathPos, e);
+          currentLookAt.current.lerpVectors(tcaPoint, new THREE.Vector3(0, 0, 0), e);
+          camera.lookAt(currentLookAt.current);
+          if (t >= 1 && controls) {
+            controls.target.copy(currentLookAt.current);
+            controls.update();
+          }
+        }
         break;
       }
       default:
@@ -310,7 +396,7 @@ export const CameraDirector: React.FC<CameraDirectorProps> = ({ controlsRef }) =
     }
 
     // Keep OrbitControls' target in sync with the scripted lookAt so that
-    // if/when it re-enables (see 'resolved' above), the next drag doesn't snap.
+    // whenever the user takes over, their next drag doesn't snap.
     if (controls) {
       controls.target.copy(currentLookAt.current);
     }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSpaceStore } from '../../store/useSpaceStore';
 import { PipelineStage } from '../../types';
+import { Tooltip } from '../Tooltip';
 
 const STEPS = ['DETECT', 'NEGOTIATE', 'DECIDE', 'OUTCOME'];
 
@@ -14,12 +15,12 @@ const STAGE_INDEX: Record<PipelineStage, number> = {
 };
 
 const CAPTIONS: Record<PipelineStage, string> = {
-  idle: 'Monitoring tracked objects — no active conjunction',
+  idle: 'Monitoring tracked objects, no active conjunction',
   detected: 'Two satellites on a converging collision course',
   negotiating: 'Operators bidding to decide who maneuvers',
   awaiting: 'Awaiting human authorization for the avoidance maneuver',
-  resolved: 'Maneuver executed — collision avoided',
-  collision: 'Maneuver vetoed — collision occurred',
+  resolved: 'Maneuver executed, collision avoided',
+  collision: 'Maneuver vetoed, collision occurred',
 };
 
 function useStage(): PipelineStage {
@@ -54,8 +55,8 @@ export const StageTracker: React.FC = () => {
       : null;
 
   return (
-    <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-30 w-[min(92%,720px)]">
-      <div className="bg-black/55 backdrop-blur-sm border border-white/10 rounded-lg px-5 py-2.5 font-mono shadow-lg">
+    <div className="w-full bg-[#0a0f1e] border-b border-white/10 shrink-0 z-30 px-4 py-2">
+      <div className="mx-auto w-[min(92%,720px)] bg-black/40 border border-white/10 rounded-lg px-5 py-2 font-mono">
         {/* Stepper */}
         <div className="flex items-center justify-between">
           {STEPS.map((label, i) => {
@@ -102,7 +103,7 @@ export const StageTracker: React.FC = () => {
                     )}
                     <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dot}`} />
                   </span>
-                  <span className={`text-[11px] font-bold tracking-widest ${textColor}`}>
+                  <span className={`text-xs font-bold tracking-widest ${textColor}`}>
                     {lbl}
                   </span>
                 </div>
@@ -118,8 +119,12 @@ export const StageTracker: React.FC = () => {
           })}
         </div>
 
-        {/* Caption */}
-        <div className="mt-1.5 text-center text-[12px] text-gray-300">{CAPTIONS[stage]}</div>
+        {/* Caption. Truncated to one line so the bar's height is fixed
+            regardless of viewport width, which the outcome banner's
+            vertical offset below relies on. */}
+        <div className="mt-1.5 text-center text-xs text-gray-300 truncate" title={CAPTIONS[stage]}>
+          {CAPTIONS[stage]}
+        </div>
 
         {/* Competing operator bids during negotiation / decision */}
         {(stage === 'negotiating' || stage === 'awaiting') &&
@@ -131,7 +136,14 @@ export const StageTracker: React.FC = () => {
                   <span className="text-gray-400">{b.operator}</span>
                   <span className="text-blue-300">ΔV {b.delta_v_ms.toFixed(3)} m/s</span>
                   {b.bid_score === minScore && (
-                    <span className="text-green-400 text-[9px] tracking-widest">WINNER</span>
+                    <Tooltip
+                      text={`Lowest bid_score wins this Contract-Net auction. bid_score = ΔV (m/s) + maneuver_count × 0.1, a fuel-budget penalty for operators that have already maneuvered more. When both operators propose the same ΔV, as here, the one with fewer prior maneuvers has the lower score and wins — ΔV alone does not decide it.`}
+                      position="top"
+                    >
+                      <span className="text-green-400 text-[9px] tracking-widest border-b border-dashed border-green-700 cursor-help">
+                        WINNER
+                      </span>
+                    </Tooltip>
                   )}
                 </div>
               ))}

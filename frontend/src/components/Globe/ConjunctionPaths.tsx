@@ -252,11 +252,21 @@ export const ConjunctionPaths: React.FC = () => {
   if (arcA.length === 0 || arcB.length === 0) return null;
 
   const approved = effectiveDecision?.decision === 'approve';
+  const vetoed = effectiveDecision?.decision === 'veto';
 
   const ci = usingBackend
     ? Math.min(backendArcs!.tcaIndex, arcA.length - 1, arcB.length - 1)
     : closestApproachIndex(arcA, arcB);
   const markerPos = arcA[ci].clone().lerp(arcB[ci], 0.5);
+
+  // A veto means the two craft actually hit at the marker: drawing the full
+  // arcs past that point in their normal healthy colour reads as "nothing
+  // happened". Cut each track off at the collision index and recolour it red
+  // so the outcome is legible instead of two intact orbits sailing on.
+  // Math.max(2, ...) so a collision at the very first sample (ci === 0) still
+  // yields a 2-point segment -- drei's Line needs at least two points.
+  const drawnArcA = vetoed ? arcA.slice(0, Math.max(2, ci + 1)) : arcA;
+  const drawnArcB = vetoed ? arcB.slice(0, Math.max(2, ci + 1)) : arcB;
 
   const maneuverName = effectiveDecision?.satelliteName;
   const aIsManeuver = approved && maneuverName === pair.satA;
@@ -332,8 +342,20 @@ export const ConjunctionPaths: React.FC = () => {
 
   return (
     <group>
-      {!aIsManeuver && <ActiveArc points={arcA} color={approved ? AMBER : PRIMARY} approved={approved} />}
-      {!bIsManeuver && <ActiveArc points={arcB} color={approved ? AMBER : SECONDARY} approved={approved} />}
+      {!aIsManeuver && (
+        <ActiveArc
+          points={drawnArcA}
+          color={vetoed ? RED : approved ? AMBER : PRIMARY}
+          approved={approved}
+        />
+      )}
+      {!bIsManeuver && (
+        <ActiveArc
+          points={drawnArcB}
+          color={vetoed ? RED : approved ? AMBER : SECONDARY}
+          approved={approved}
+        />
+      )}
 
       {/* Full orbit-plane rings so the two planes read as planes, not squiggles. */}
       {posA && velA && <OrbitRing position={posA} velocityDir={velA} color={PRIMARY} />}
@@ -383,7 +405,12 @@ export const ConjunctionPaths: React.FC = () => {
           />
         </>
       )}
-      {approved && safeArc && safeArc.length > 0 && exaggerationCaption && (
+      {/* Held back while decisionOutcome is up: OutcomeOverlay's centre banner
+          sits at roughly the same on-screen spot (CameraDirector keeps the
+          pair centred) for its ~3.6s window. This caption carries real info
+          (the exaggeration disclosure) so it still shows once the banner
+          clears, for the rest of DECISION_HOLD_MS. */}
+      {approved && safeArc && safeArc.length > 0 && exaggerationCaption && !decisionOutcome && (
         <Html position={safeArc[Math.floor(safeArc.length / 2)]} center zIndexRange={[5, 0]}>
           <div
             style={{
@@ -404,8 +431,10 @@ export const ConjunctionPaths: React.FC = () => {
         </Html>
       )}
 
-      {/* Closest-approach marker (only while a collision is still possible) */}
-      {!approved && <TCAMarker position={markerPos} color={RED} tcaMs={tcaMs} />}
+      {/* Closest-approach marker: only while a collision is still possible.
+          Once vetoed, the explosion IS the marker -- a pulsing "tracking"
+          ring at the same spot would read as still-live and undercut it. */}
+      {!approved && !vetoed && <TCAMarker position={markerPos} color={RED} tcaMs={tcaMs} />}
     </group>
   );
 };

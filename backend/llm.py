@@ -17,7 +17,10 @@ def _get_client():
     return _client
 
 
-async def groq_chat(prompt: str, *, system: str | None = None, json_mode: bool = False, max_tokens: int = 256) -> str | None:
+async def groq_chat(
+    prompt: str, *, system: str | None = None, json_mode: bool = False,
+    max_tokens: int = 256, reasoning_effort: str | None = None,
+) -> str | None:
     if not settings.groq_api_key:
         return None
     try:
@@ -28,6 +31,8 @@ async def groq_chat(prompt: str, *, system: str | None = None, json_mode: bool =
         kwargs = {"model": settings.groq_model, "messages": messages, "max_completion_tokens": max_tokens, "temperature": 0.3}
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
+        if reasoning_effort:
+            kwargs["reasoning_effort"] = reasoning_effort
         resp = await _get_client().chat.completions.create(**kwargs)
         text = resp.choices[0].message.content
         return text.strip() if text else None

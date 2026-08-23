@@ -14,6 +14,16 @@ import { Tooltip } from '../Tooltip';
 // value shown on screen and the value we quote.
 const REVIEW_WINDOW_S = Number(import.meta.env.VITE_HITL_TIMEOUT_S ?? 60);
 
+// Fixed panel height in px. Substantial enough to read as the demo's one
+// human decision point (200-240px), not a sliver. CameraDirector.tsx reads
+// this same value (PANEL_HEIGHT_PX) to size how far it lifts the globe
+// while this panel is open -- keep the two in sync if this changes.
+export const HITL_PANEL_HEIGHT_PX = 224;
+// Matches App.tsx's mission-control log column width exactly, so the panel's
+// right edge always lands exactly where the log column begins, at any
+// viewport width.
+const LOG_COLUMN_WIDTH = 'clamp(18rem,22vw,28rem)';
+
 export const HITLPanel: React.FC = () => {
   const {
     currentHitlRequest,
@@ -130,7 +140,7 @@ export const HITLPanel: React.FC = () => {
         // Do not leave the UI asserting an outcome the backend never confirmed.
         console.error(`Failed to ${decision}`, e);
         addToast(
-          `Maneuver ${decision} failed — the backend did not confirm. Nothing was executed.`,
+          `Maneuver ${decision} failed: the backend did not confirm. Nothing was executed.`,
           'error'
         );
         setDecisionOutcome(null);
@@ -145,7 +155,7 @@ export const HITLPanel: React.FC = () => {
   actionRef.current = handleAction;
 
   const formatPcFraction = (pc: number | null) => {
-    if (pc === null) return "\u2014";
+    if (pc === null) return "-";
     if (pc <= 0) return "SAFE";
     return "1 in " + Math.round(1 / pc).toLocaleString();
   };
@@ -183,152 +193,151 @@ export const HITLPanel: React.FC = () => {
   // Real burn timestamp from the proposal instead of a hardcoded "60 min".
   const burnDate = new Date(proposal.burn_time);
   const burnLabel = isNaN(burnDate.getTime())
-    ? '\u2014'
+    ? '-'
     : `${burnDate.toISOString().slice(11, 16)} UTC`;
   const missBeforeKm = conj ? conj.miss_distance_km : null;
 
   return (
-    <div 
-      className={`fixed bottom-0 left-0 right-0 h-auto min-h-[280px] bg-[#0f172a] border-t-4 border-red-500 z-50 text-white shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col font-mono transition-transform duration-300 ease-out ${mounted ? 'translate-y-0' : 'translate-y-full'}`}
+    <div
+      style={{ height: `${HITL_PANEL_HEIGHT_PX}px`, right: LOG_COLUMN_WIDTH }}
+      className={`fixed bottom-0 left-0 bg-[#0f172a] border-t-4 border-red-500 z-50 text-white shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col font-mono transition-transform duration-300 ease-out ${mounted ? 'translate-y-0' : 'translate-y-full'}`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 bg-black/20">
-        <div className="flex items-center space-x-3 text-red-500 font-bold text-lg tracking-wider">
-          <ShieldAlert className="w-6 h-6" />
-          <Tooltip text="Human-In-The-Loop: every maneuver requires explicit human approval before execution. No AI acts without oversight." position="bottom">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-black/20 shrink-0">
+        <div className="flex items-center space-x-2 text-red-500 font-bold text-base tracking-wider">
+          <ShieldAlert className="w-5 h-5" />
+          <Tooltip text="Human-In-The-Loop: every maneuver requires explicit human approval before execution. No AI acts without oversight." position="top">
             <span>MANEUVER AUTHORIZATION REQUIRED</span>
           </Tooltip>
         </div>
-        <div className={`flex items-center space-x-2 text-xl font-bold ${timeLeft < REVIEW_WINDOW_S / 3 ? 'text-red-500 animate-pulse' : 'text-gray-300'}`}>
-          <Clock className="w-5 h-5" />
+        <div className={`flex items-center space-x-1.5 text-base font-bold ${timeLeft < REVIEW_WINDOW_S / 3 ? 'text-red-500 animate-pulse' : 'text-gray-300'}`}>
+          <Clock className="w-4 h-4" />
           <span>{timeLeft}s</span>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex flex-col lg:flex-row flex-1 p-6 gap-5 lg:gap-0">
-        {/* Left Column: Maneuver Details */}
-        <div className="w-full lg:w-1/3 flex flex-col justify-center space-y-4 text-sm lg:border-r border-white/10 lg:pr-6">
-          <div className="flex justify-between">
-            <span className="text-gray-400">SATELLITE:</span>
-            <span className="font-bold text-lg">{proposal.satellite_name}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">OPERATOR:</span>
-            <span className="font-bold">{proposal.operator}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">
-              <Tooltip text="Delta-V: the velocity change produced by a thruster burn. Computed using Clohessy-Wiltshire relative motion equations." position="bottom">
-                <span className="border-b border-dashed border-gray-600">ΔV</span>
-              </Tooltip>
-              :
+      {/* AI Rationale: the single most judge-facing sentence in the app --
+          the LLM explaining a real decision -- so it gets a prominent spot
+          at the top with room to actually be read, not a truncated line at
+          the bottom. */}
+      {proposal.rationale && (
+        <div className="px-4 py-2 border-b border-white/10 bg-blue-500/10 shrink-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-blue-400 font-bold text-[11px] tracking-widest shrink-0">
+              AI RATIONALE
             </span>
-            <span className="font-bold text-blue-400">
-              {proposal.delta_v_ms.toFixed(3)} m/s{' '}
-              <Tooltip text="Along the direction of orbital travel. Most fuel-efficient for changing arrival time at the conjunction point." position="bottom">
-                <span className="border-b border-dashed border-blue-800">{proposal.burn_direction}</span>
-              </Tooltip>
-            </span>
+            <p className="text-sm text-gray-100 leading-snug line-clamp-2" title={proposal.rationale}>
+              {proposal.rationale}
+            </p>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">BURN AT:</span>
-            <span className="font-bold text-yellow-400">{burnLabel}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">MISS DISTANCE:</span>
-            <span className="font-bold text-green-400">
-              {missBeforeKm !== null ? `${missBeforeKm.toFixed(3)}` : '\u2014'}
-              {' \u2192 '}
-              {proposal.post_maneuver_miss_km.toFixed(3)} km
-            </span>
-          </div>
-          {proposal.rationale && (
-            <div className="flex justify-between">
-              <span className="text-gray-400 shrink-0 mr-3">AI RATIONALE:</span>
-              <span className="text-xs text-gray-500 text-right">{proposal.rationale}</span>
-            </div>
-          )}
+        </div>
+      )}
+
+      {/* Main Content. overflow-y-auto is a safety net, not the intended
+          look: below the lg breakpoint this stacks vertically and needs
+          more than the panel's fixed height, so it scrolls internally
+          instead of bleeding out over the globe above it. */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center flex-1 min-h-0 overflow-y-auto px-4 py-3 gap-3 lg:gap-4">
+        {/* Left: Maneuver Details */}
+        <div className="grid grid-cols-4 gap-x-3 gap-y-1.5 text-sm lg:w-[34%] lg:border-r border-white/10 lg:pr-4">
+          <span className="text-gray-400">SATELLITE</span>
+          <span className="font-bold text-right truncate">{proposal.satellite_name}</span>
+          <span className="text-gray-400">OPERATOR</span>
+          <span className="font-bold text-right truncate">{proposal.operator}</span>
+
+          <span className="text-gray-400">
+            <Tooltip text="Delta-V: the velocity change produced by a thruster burn. Computed using Clohessy-Wiltshire relative motion equations." position="top">
+              <span className="border-b border-dashed border-gray-600">ΔV</span>
+            </Tooltip>
+          </span>
+          <span className="font-bold text-blue-400 text-right truncate">
+            {proposal.delta_v_ms.toFixed(3)} m/s{' '}
+            <Tooltip text="Along the direction of orbital travel. Most fuel-efficient for changing arrival time at the conjunction point." position="top">
+              <span className="border-b border-dashed border-blue-800">{proposal.burn_direction}</span>
+            </Tooltip>
+          </span>
+          <span className="text-gray-400">BURN AT</span>
+          <span className="font-bold text-yellow-400 text-right truncate">{burnLabel}</span>
+
+          <span className="text-gray-400">MISS DIST.</span>
+          <span className="font-bold text-green-400 text-right col-span-3 truncate">
+            {missBeforeKm !== null ? `${missBeforeKm.toFixed(2)}` : '-'}
+            {' → '}
+            {proposal.post_maneuver_miss_km.toFixed(2)} km
+          </span>
         </div>
 
-        {/* Right Column: Risk Comparison */}
-        <div className="w-full lg:w-2/3 flex px-0 lg:px-6 gap-4 lg:gap-8 items-center justify-center">
+        {/* Right: Risk Comparison */}
+        <div className="flex flex-1 gap-3 lg:gap-6 items-center">
           {/* Before */}
-          <div className="flex-1 bg-black/30 rounded-xl p-4 border border-white/10 flex flex-col items-center">
-            <div className="text-gray-400 mb-2 font-bold tracking-widest text-xs">BEFORE MANEUVER</div>
-            <div className="text-red-400 text-sm mb-1">
-              <Tooltip text="Probability of Collision — how likely a physical impact is at closest approach. Industry alert threshold: 1 in 10,000 (1×10⁻⁴). We target below 1 in 1,000,000." position="top">
-                <span className="border-b border-dashed border-red-800">Pc</span>
-              </Tooltip>
-              : {pc_before !== null ? pc_before.toExponential(2) : '\u2014'}
+          <div className="flex-1 bg-black/30 rounded-lg px-3 py-2 border border-white/10 flex items-center gap-3">
+            <div className="flex flex-col items-start shrink-0">
+              <span className="text-gray-400 font-bold tracking-widest text-[10px]">BEFORE</span>
+              <span className="text-3xl font-bold text-red-500 leading-tight">{formatPcFraction(pc_before)}</span>
             </div>
-            <div className="text-3xl font-bold text-red-500 mb-4">{formatPcFraction(pc_before)}</div>
-            <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden mb-2">
-              <div className="h-full bg-red-500" style={{ width: `${riskBeforeWidth}%` }}></div>
-            </div>
-            <div className="flex items-center space-x-2 text-red-500 text-sm font-bold">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-red-400"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-              </span>
-              <span>RISK</span>
+            <div className="flex-1 flex flex-col gap-0.5">
+              <div className="text-red-400 text-xs">
+                <Tooltip text="Probability of Collision: how likely a physical impact is at closest approach. Industry alert threshold: 1 in 10,000 (1×10⁻⁴). We target below 1 in 1,000,000." position="top">
+                  <span className="border-b border-dashed border-red-800">Pc</span>
+                </Tooltip>
+                : {pc_before !== null ? pc_before.toExponential(2) : '-'}
+              </div>
+              <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                <div className="h-full bg-red-500" style={{ width: `${riskBeforeWidth}%` }}></div>
+              </div>
             </div>
           </div>
 
           {/* After */}
-          <div className="flex-1 bg-black/30 rounded-xl p-4 border border-white/10 flex flex-col items-center">
-            <div className="text-gray-400 mb-2 font-bold tracking-widest text-xs">AFTER</div>
-            <div className="text-green-400 text-sm mb-1">
-              <Tooltip text="Probability of Collision — how likely a physical impact is at closest approach. Industry alert threshold: 1 in 10,000 (1×10⁻⁴). We target below 1 in 1,000,000." position="top">
-                <span className="border-b border-dashed border-green-800">Pc</span>
-              </Tooltip>
-              : {pc_after.toExponential(2)}
+          <div className="flex-1 bg-black/30 rounded-lg px-3 py-2 border border-white/10 flex items-center gap-3">
+            <div className="flex flex-col items-start shrink-0">
+              <span className="text-gray-400 font-bold tracking-widest text-[10px]">AFTER</span>
+              <span className="text-3xl font-bold text-green-500 leading-tight">{formatPcFraction(pc_after)}</span>
             </div>
-            <div className="text-3xl font-bold text-green-500 mb-4">{formatPcFraction(pc_after)}</div>
-            <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden mb-2">
-              <div className="h-full bg-green-500" style={{ width: `${riskAfterWidth}%` }}></div>
-            </div>
-            <div className="flex items-center space-x-2 text-green-500 text-sm font-bold">
-              <span className="relative flex h-3 w-3">
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-              </span>
-              <span>SAFE</span>
+            <div className="flex-1 flex flex-col gap-0.5">
+              <div className="text-green-400 text-xs">
+                <Tooltip text="Probability of Collision: how likely a physical impact is at closest approach. Industry alert threshold: 1 in 10,000 (1×10⁻⁴). We target below 1 in 1,000,000." position="top">
+                  <span className="border-b border-dashed border-green-800">Pc</span>
+                </Tooltip>
+                : {pc_after.toExponential(2)}
+              </div>
+              <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                <div className="h-full bg-green-500" style={{ width: `${riskAfterWidth}%` }}></div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Countdown Bar & Actions */}
-      <div className="relative px-6 pb-6 flex items-center justify-between">
-        {/* Countdown Bar (Background) */}
-        <div className="absolute top-0 left-6 right-6 h-1 bg-gray-800 rounded-full overflow-hidden -mt-2">
-          <div 
-            className={`h-full transition-all duration-1000 ease-linear ${getTimerColor()}`} 
-            style={{ width: `${timerWidth}%`, float: 'right' }}
-          ></div>
-        </div>
-
-        <div className="flex-1 flex justify-center space-x-6 mt-2">
+        {/* Actions */}
+        <div className="flex items-center justify-center gap-3 shrink-0">
           <button
             onClick={() => handleAction('approve')}
             disabled={submitting}
-            className="flex items-center space-x-3 px-12 py-4 bg-[#22c55e] hover:bg-[#16a34a] disabled:bg-green-900 disabled:cursor-not-allowed text-white font-bold rounded shadow-[0_0_16px_rgba(34,197,94,0.3)] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-300/60"
+            className="flex items-center space-x-2 px-7 py-2.5 bg-[#22c55e] hover:bg-[#16a34a] disabled:bg-green-900 disabled:cursor-not-allowed text-white font-bold rounded shadow-[0_0_16px_rgba(34,197,94,0.3)] transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-300/60"
           >
-            <Check className="w-6 h-6" />
-            <span className="text-xl tracking-wider">
-              {submitting ? 'EXECUTING\u2026' : 'APPROVE MANEUVER'}
+            <Check className="w-4 h-4" />
+            <span className="text-base tracking-wider whitespace-nowrap">
+              {submitting ? 'EXECUTING…' : 'APPROVE'}
             </span>
           </button>
 
           <button
             onClick={() => handleAction('veto')}
             disabled={submitting}
-            className="flex items-center space-x-2 px-8 py-4 bg-red-600 hover:bg-red-500 disabled:bg-red-900 disabled:cursor-not-allowed text-white font-bold rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-300/60"
+            className="flex items-center space-x-2 px-6 py-2.5 bg-red-600 hover:bg-red-500 disabled:bg-red-900 disabled:cursor-not-allowed text-white font-bold rounded transition-colors focus:outline-none focus:ring-2 focus:ring-red-300/60"
           >
-            <X className="w-5 h-5" />
-            <span className="text-lg tracking-wider">VETO</span>
+            <X className="w-4 h-4" />
+            <span className="text-base tracking-wider">VETO</span>
           </button>
         </div>
+      </div>
+
+      {/* Countdown Bar */}
+      <div className="relative h-1.5 bg-gray-800">
+        <div
+          className={`h-full transition-all duration-1000 ease-linear ${getTimerColor()}`}
+          style={{ width: `${timerWidth}%`, float: 'right' }}
+        ></div>
       </div>
     </div>
   );
