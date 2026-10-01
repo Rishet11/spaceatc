@@ -10,6 +10,9 @@ pinned: false
 
 # SpaceATC 🛰️
 
+<!-- Test PR smoke marker. -->
+<!-- Second test PR smoke marker. -->
+
 Multi-agent autonomous satellite collision avoidance negotiation system.
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
