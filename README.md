@@ -176,6 +176,11 @@ curl -X POST http://localhost:7860/api/demo/inject
 # Click APPROVE in the browser when the HITL panel appears to execute the maneuver.
 ```
 
+### Run Tests
+```bash
+pytest
+```
+
 ---
 
 ## 🔭 Future Scope
